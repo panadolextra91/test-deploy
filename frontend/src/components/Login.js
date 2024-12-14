@@ -16,7 +16,7 @@ const Login = () => {
         e.preventDefault();
 
         try {
-            const response = await axios.post('http://localhost:3000/api/users/login', {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/users/login`, {
                 username,
                 password
             });
@@ -33,7 +33,7 @@ const Login = () => {
             }
 
             // Fetch user profile to check role
-            const profileResponse = await axios.get('http://localhost:3000/api/users/profile', {
+            const profileResponse = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
 

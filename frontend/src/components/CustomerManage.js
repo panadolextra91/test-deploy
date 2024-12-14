@@ -5,14 +5,14 @@ import {
     PlusOutlined,
     UserOutlined,
 } from "@ant-design/icons";
-import {Table, Button, Space, message, Avatar, Modal, Input} from "antd";
+import { Table, Button, Space, message, Avatar, Modal, Input } from "antd";
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
 import "./CustomerManage.css";
 import axios from "axios";
-import AddCustomerForm from './AddCustomerForm';
-import EditCustomerForm from './EditCustomerForm';
-import {useNavigate} from "react-router-dom";
+import AddCustomerForm from "./AddCustomerForm";
+import EditCustomerForm from "./EditCustomerForm";
+import { useNavigate } from "react-router-dom";
 
 const CustomerManage = () => {
     const { Search } = Input;
@@ -25,7 +25,7 @@ const CustomerManage = () => {
     const userRole = sessionStorage.getItem("userRole");
 
     const onSearch = async (value) => {
-        const token = sessionStorage.getItem('token');
+        const token = sessionStorage.getItem("token");
 
         if (!value) {
             fetchCustomers(); // Fetch all customers if the search input is cleared
@@ -33,34 +33,39 @@ const CustomerManage = () => {
         }
 
         try {
-            const response = await axios.get(`http://localhost:3000/api/customers/phone/${value}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await axios.get(
+                `${process.env.REACT_APP_BACKEND_URL}/api/customers/phone/${value}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
 
             setCustomers([response.data]); // Wrap the single customer in an array for consistency
             message.success(`Found customer with phone number "${value}".`);
         } catch (error) {
-            console.error('Error searching customers:', error);
+            console.error("Error searching customers:", error);
             setCustomers([]); // Clear the table if no customer is found
             message.error(`No customer found for phone number "${value}".`);
         }
     };
 
-
     useEffect(() => {
         fetchCustomers();
     }, []);
 
-    const handleAvaterClick = () => {
-        navigate('/profile');
-    }
+    const handleAvatarClick = () => {
+        navigate("/profile");
+    };
 
     const fetchCustomers = async () => {
         try {
             const token = sessionStorage.getItem("token");
-            const response = await axios.get("http://localhost:3000/api/customers", {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await axios.get(
+                `${process.env.REACT_APP_BACKEND_URL}/api/customers`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setCustomers(response.data);
         } catch (error) {
             message.error("Failed to fetch customer data.");
@@ -73,7 +78,7 @@ const CustomerManage = () => {
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.post(
-                "http://localhost:3000/api/customers",
+                `${process.env.REACT_APP_BACKEND_URL}/api/customers`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -91,7 +96,7 @@ const CustomerManage = () => {
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.put(
-                `http://localhost:3000/api/customers/${editingCustomer.id}`,
+                `${process.env.REACT_APP_BACKEND_URL}/api/customers/${editingCustomer.id}`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -113,9 +118,12 @@ const CustomerManage = () => {
     const handleDeleteCustomer = async (id) => {
         try {
             const token = sessionStorage.getItem("token");
-            await axios.delete(`http://localhost:3000/api/customers/${id}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            await axios.delete(
+                `${process.env.REACT_APP_BACKEND_URL}/api/customers/${id}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                }
+            );
             setCustomers(customers.filter((customer) => customer.id !== id));
             message.success("Customer deleted successfully.");
         } catch (error) {
@@ -135,9 +143,9 @@ const CustomerManage = () => {
             key: "name",
         },
         {
-            title: 'Phone',
-            dataIndex: 'phone',
-            key: 'phone',
+            title: "Phone",
+            dataIndex: "phone",
+            key: "phone",
         },
         {
             title: "Email",
@@ -187,7 +195,7 @@ const CustomerManage = () => {
                         <p>Dashboard / Customer Management</p>
                     </div>
                     <div className="header-right">
-                        <div onClick={handleAvaterClick} style={{cursor: 'pointer'}}>
+                        <div onClick={handleAvatarClick} style={{ cursor: "pointer" }}>
                             <Avatar size={50} icon={<UserOutlined />} />
                         </div>
                     </div>
@@ -197,9 +205,9 @@ const CustomerManage = () => {
                         <Button
                             className="add-button"
                             type="primary"
-                            icon={<PlusOutlined/>}
+                            icon={<PlusOutlined />}
                             onClick={() => setIsAddCustomerVisible(true)}
-                            style={{marginBottom: 16}}
+                            style={{ marginBottom: 16 }}
                         >
                             Add Customer
                         </Button>
@@ -207,9 +215,8 @@ const CustomerManage = () => {
                             placeholder="Search customers..."
                             allowClear
                             onSearch={onSearch}
-                            style={{width: 500}}
+                            style={{ width: 500 }}
                         />
-
                     </section>
                     <Table
                         columns={columns}

@@ -1,28 +1,19 @@
-import React, {useEffect, useState} from "react";
+import React, { useEffect, useState } from "react";
 import {
-    HomeOutlined,
-    MedicineBoxOutlined,
-    AppstoreOutlined,
-    TeamOutlined,
-    ShoppingCartOutlined,
-    FileTextOutlined,
-    BarChartOutlined,
     UserOutlined,
-    LoginOutlined,
     EditOutlined,
     DeleteOutlined,
     PlusOutlined
 } from '@ant-design/icons';
-import {Avatar, Button, message, Space, Table} from "antd";
-import logo from '../imgs/trace.svg';
+import { Avatar, Button, message, Space, Table } from "antd";
 import './Suppliers.css';
-import AddSupplierForm from "./AddSupplierForm"; // Import AddSupplierForm component
+import AddSupplierForm from "./AddSupplierForm";
 import EditSupplierForm from "./EditSupplierForm";
-import axios from "axios"; // Import EditSupplierForm component
+import axios from "axios";
 import PharmacistSidebar from "./PharmacistSidebar";
 import AdminSidebar from "./AdminSidebar";
-import {useNavigate} from "react-router-dom";
-//Suppliers.js
+import { useNavigate } from "react-router-dom";
+
 const Suppliers = () => {
     const navigate = useNavigate();
     const [suppliers, setSuppliers] = useState([]);
@@ -32,17 +23,18 @@ const Suppliers = () => {
 
     useEffect(() => {
         fetchSuppliers();
-    });
-    const handleAvaterClick = () => {
+    }, []);
+
+    const handleAvatarClick = () => {
         navigate('/profile');
-    }
+    };
 
     const userRole = sessionStorage.getItem('userRole');
 
     const fetchSuppliers = async () => {
         try {
             const token = localStorage.getItem('token') || sessionStorage.getItem('token');
-            const response = await axios.get('http://localhost:3000/api/suppliers', {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/suppliers`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
@@ -55,11 +47,11 @@ const Suppliers = () => {
             }));
             setSuppliers(fetchedSuppliers);
         } catch (error) {
-            console.error('Error fetching');
+            console.error('Error fetching suppliers:', error);
             if (error.response && error.response.status === 401) {
                 message.error('Unauthorized');
             } else {
-                message.error('Fail fetching suppliers');
+                message.error('Failed to fetch suppliers');
             }
         }
     };
@@ -77,13 +69,19 @@ const Suppliers = () => {
     const handleAddSupplier = async (values) => {
         try {
             const token = sessionStorage.getItem('token');
-            const response = await axios.post('http://localhost:3000/api/suppliers', values, {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/suppliers`, values, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setSuppliers([...suppliers, response.data]);
+            setSuppliers([...suppliers, {
+                key: response.data.id,
+                name: response.data.name,
+                contact: response.data.contact_info,
+                address: response.data.address
+            }]);
             message.success("Supplier added successfully.");
             setIsAddModalVisible(false);
         } catch (error) {
+            console.error("Error adding supplier:", error);
             message.error("Failed to add supplier.");
         }
     };
@@ -92,29 +90,28 @@ const Suppliers = () => {
         try {
             const token = sessionStorage.getItem('token');
             const payload = {
-                id: currentSupplier.key,
                 name: values.name,
                 contact_info: values.contact_info,
-                address: values.address,
+                address: values.address
             };
-    
-            const response = await axios.put(
-                `http://localhost:3000/api/suppliers/${payload.id}`,
+
+            await axios.put(
+                `${process.env.REACT_APP_BACKEND_URL}/api/suppliers/${currentSupplier.key}`,
                 payload,
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-    
-            const updatedValues = suppliers.map(sup =>
-                sup.id === payload.id ? { ...sup, ...response.data } : sup
+
+            const updatedSuppliers = suppliers.map(sup =>
+                sup.key === currentSupplier.key ? { ...sup, ...payload } : sup
             );
-            setSuppliers(updatedValues);
+            setSuppliers(updatedSuppliers);
             message.success("Supplier updated successfully.");
             setIsEditModalVisible(false);
         } catch (error) {
-            console.error("Error updating medicine:", error);
-            message.error("Failed to update supplier. Please try again.");
+            console.error("Error updating supplier:", error);
+            message.error("Failed to update supplier.");
         }
     };
 
@@ -129,12 +126,13 @@ const Suppliers = () => {
     const deleteSupplier = async (id) => {
         try {
             const token = sessionStorage.getItem('token');
-            await axios.delete(`http://localhost:3000/api/suppliers/${id}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_URL}/api/suppliers/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
-            setSuppliers(suppliers.filter(supplier => supplier.id !== id));
+            setSuppliers(suppliers.filter(supplier => supplier.key !== id));
             message.success("Supplier deleted successfully.");
         } catch (error) {
+            console.error("Error deleting supplier:", error);
             message.error("Failed to delete supplier.");
         }
     };
@@ -169,10 +167,8 @@ const Suppliers = () => {
 
     return (
         <div className="suppliers-container">
-            {/* Sidebar Navigation */}
             { userRole === 'admin' ? <AdminSidebar/> : <PharmacistSidebar/>}
 
-            {/* Main Content */}
             <main className="main-content">
                 <header className="header">
                     <div className='header-left'>
@@ -180,7 +176,7 @@ const Suppliers = () => {
                         <p>Dashboard / Suppliers</p>
                     </div>
                     <div className='header-right'>
-                        <div onClick={handleAvaterClick} style={{cursor: 'pointer'}}>
+                        <div onClick={handleAvatarClick} style={{cursor: 'pointer'}}>
                             <Avatar size={50} icon={<UserOutlined/>}/>
                         </div>
                     </div>
@@ -205,7 +201,7 @@ const Suppliers = () => {
                 />
             </main>
         </div>
-    )
-}
+    );
+};
 
 export default Suppliers;

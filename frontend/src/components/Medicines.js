@@ -7,7 +7,6 @@ import {
 } from '@ant-design/icons';
 import {Avatar, Button, Space, Table, Tag, Tooltip, message, Input} from "antd";
 import axios from "axios";
-import logo from '../imgs/trace.svg';
 import './Medicines.css';
 import AddMedicineForm from "./AddMedicineForm";
 import EditMedicineForm from "./EditMedicineForm";
@@ -38,7 +37,7 @@ const Medicines = () => {
         }
 
         try {
-            const response = await axios.get(`http://localhost:3000/api/medicines/name/${value}`, {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/name/${value}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -49,8 +48,6 @@ const Medicines = () => {
             message.error(`No medicines found for "${value}".`);
         }
     };
-
-
 
     useEffect(() => {
         fetchMedicines();
@@ -67,7 +64,7 @@ const Medicines = () => {
     const fetchMedicines = async () => {
         try {
             const token = sessionStorage.getItem('token');
-            const response = await axios.get('http://localhost:3000/api/medicines', {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMedicines(response.data);
@@ -81,7 +78,7 @@ const Medicines = () => {
     const fetchCategories = async () => {
         try {
             const token = sessionStorage.getItem('token'); // Ensure token is retrieved
-            const response = await axios.get('http://localhost:3000/api/categories', {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/categories`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setCategories(response.data);
@@ -93,7 +90,7 @@ const Medicines = () => {
     const fetchSuppliers = async () => {
         try {
             const token = sessionStorage.getItem('token'); // Ensure token is retrieved
-            const response = await axios.get('http://localhost:3000/api/suppliers', {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/suppliers`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setSuppliers(response.data);
@@ -105,7 +102,7 @@ const Medicines = () => {
     const fetchLocations = async () => {
         try {
             const token = sessionStorage.getItem('token'); // Ensure token is retrieved
-            const response = await axios.get('http://localhost:3000/api/locations', {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/locations`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setLocations(response.data);
@@ -113,7 +110,6 @@ const Medicines = () => {
             message.error("Failed to fetch locations.");
         }
     };
-
 
     const showAddMedicineModal = () => {
         setIsAddModalVisible(true);
@@ -127,7 +123,7 @@ const Medicines = () => {
     const handleAddMedicine = async (values) => {
         try {
             const token = sessionStorage.getItem('token');
-            const response = await axios.post('http://localhost:3000/api/medicines', values, {
+            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/medicines`, values, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMedicines([...medicines, response.data]); // Add new medicine to state
@@ -142,18 +138,15 @@ const Medicines = () => {
         try {
             const token = sessionStorage.getItem('token');
 
-            // Map the current values to their respective IDs
             const category = categories.find(cat => cat.name === updatedMedicine.category);
             const supplier = suppliers.find(sup => sup.name === updatedMedicine.supplier);
             const location = locations.find(loc => loc.name === updatedMedicine.location);
-    
-            // Validate that the mapping worked
+
             if (!category || !supplier || !location) {
                 message.error("Invalid category, supplier, or location.");
                 return;
             }
-    
-            // Prepare the payload for the API
+
             const payload = {
                 name: updatedMedicine.name,
                 category_id: category.id,
@@ -166,22 +159,20 @@ const Medicines = () => {
                     ? moment(updatedMedicine.expirationDate).format('YYYY-MM-DD')
                     : null,
             };
-    
-            // Send the update request to the API
+
             const response = await axios.put(
-                `http://localhost:3000/api/medicines/${updatedMedicine.id}`,
+                `${process.env.REACT_APP_BACKEND_URL}/api/medicines/${updatedMedicine.id}`,
                 payload,
                 {
                     headers: { Authorization: `Bearer ${token}` }
                 }
             );
-    
-            // Update the local state with the response data
+
             const updatedMedicines = medicines.map(med =>
                 med.id === updatedMedicine.id ? { ...med, ...response.data } : med
             );
             setMedicines(updatedMedicines);
-    
+
             message.success("Medicine updated successfully.");
             setIsEditModalVisible(false);
         } catch (error) {
@@ -198,7 +189,7 @@ const Medicines = () => {
     const deleteMedicine = async (id) => {
         try {
             const token = sessionStorage.getItem('token');
-            await axios.delete(`http://localhost:3000/api/medicines/${id}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
             });
             setMedicines(medicines.filter(medicine => medicine.id !== id));

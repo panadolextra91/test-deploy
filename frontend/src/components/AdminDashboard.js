@@ -40,7 +40,7 @@ const AdminDashboard = () => {
 
     const fetchUsersData = async (token) => {
         try {
-            const response = await axios.get("http://localhost:3000/api/users", {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -62,7 +62,7 @@ const AdminDashboard = () => {
         try {
             console.log("Token being sent:", token);
 
-            const response = await axios.get("http://localhost:3000/api/invoices/sales/selling-medicines", {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/invoices/sales/selling-medicines`, {
                 headers: { Authorization: `Bearer ${token}` }, // Ensure token is here
             });
             setSellingMedicinesData(response.data);
@@ -74,7 +74,7 @@ const AdminDashboard = () => {
 
     const fetchRevenueData = async (token) => {
         try {
-            const response = await axios.get("http://localhost:3000/api/invoices/revenue/monthly", {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/invoices/revenue/monthly`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setRevenueData(response.data);
@@ -89,7 +89,7 @@ const AdminDashboard = () => {
     const fetchDailyIncome = async (token) => {
         try {
             const response = await axios.get(
-                "http://localhost:3000/api/invoices/sales/daily-income",
+                `${process.env.REACT_APP_BACKEND_URL}/api/invoices/sales/daily-income`,
                 { headers: { Authorization: `Bearer ${token}` } }
             );
 
@@ -106,20 +106,19 @@ const AdminDashboard = () => {
         }
     };
 
-
     const fetchDashboardData = async (token) => {
         try {
-            const lowStockResponse = await axios.get("http://localhost:3000/api/medicines/low-stock", {
+            const lowStockResponse = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/low-stock`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setLowStockAlerts(lowStockResponse.data);
 
-            const nearExpiryResponse = await axios.get("http://localhost:3000/api/medicines/near-expiry", {
+            const nearExpiryResponse = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/near-expiry`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setNearExpiryAlerts(nearExpiryResponse.data);
 
-            const outOfStockResponse = await axios.get("http://localhost:3000/api/medicines/out-of-stock", {
+            const outOfStockResponse = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/out-of-stock`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setOutOfStockAlerts(outOfStockResponse.data);
@@ -131,7 +130,7 @@ const AdminDashboard = () => {
 
     const fetchUserProfile = async (token) => {
         try {
-            const response = await axios.get("http://localhost:3000/api/users/profile", {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUserName(response.data.name);

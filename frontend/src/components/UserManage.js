@@ -9,10 +9,10 @@ import { Table, Button, Space, message, Avatar, Modal } from "antd";
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
 import AddUserForm from "./AddUserForm";
-import EditUserForm from "./EditUserForm"; // Import the EditUserForm component
+import EditUserForm from "./EditUserForm";
 import "./UserManage.css";
 import axios from "axios";
-import {useNavigate} from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 
 const UserManage = () => {
     const navigate = useNavigate();
@@ -23,9 +23,9 @@ const UserManage = () => {
     const [loading, setLoading] = useState(true);
 
     const userRole = sessionStorage.getItem("userRole");
-    const handleAvaterClick = () => {
-        navigate('/profile');
-    }
+    const handleAvatarClick = () => {
+        navigate("/profile");
+    };
 
     useEffect(() => {
         fetchUsers();
@@ -34,7 +34,7 @@ const UserManage = () => {
     const fetchUsers = async () => {
         try {
             const token = sessionStorage.getItem("token");
-            const response = await axios.get("http://localhost:3000/api/users", {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(response.data);
@@ -49,11 +49,11 @@ const UserManage = () => {
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.post(
-                "http://localhost:3000/api/users",
+                `${process.env.REACT_APP_BACKEND_URL}/api/users`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
-                } 
+                }
             );
             setUsers([...users, response.data]);
             message.success("User added successfully.");
@@ -64,42 +64,33 @@ const UserManage = () => {
     };
 
     const handleEditUser = async (values) => {
-        console.log("Edit values:", values); // Log input values
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.put(
-                `http://localhost:3000/api/users/${editingUser.id}`,
+                `${process.env.REACT_APP_BACKEND_URL}/api/users/${editingUser.id}`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
                 }
             );
-
-            // Extract the updated user object from the response
             const updatedUser = response.data.user;
-            console.log("Updated User from API:", updatedUser); // Log the updated user object
-
-            // Update the state with the new user data
-            setUsers((prevUsers) => {
-                const updatedUsers = prevUsers.map((user) =>
+            setUsers((prevUsers) =>
+                prevUsers.map((user) =>
                     user.id === updatedUser.id ? { ...user, ...updatedUser } : user
-                );
-                console.log("Updated Users State:", updatedUsers); // Log the updated state
-                return [...updatedUsers];
-            });
-
+                )
+            );
             message.success(response.data.message || "User updated successfully.");
             setIsEditUserVisible(false);
             setEditingUser(null);
         } catch (error) {
-            console.error("Failed to update user:", error);
             message.error("Failed to update user.");
         }
     };
+
     const handleDeleteUser = async (id) => {
         try {
             const token = sessionStorage.getItem("token");
-            await axios.delete(`http://localhost:3000/api/users/${id}`, {
+            await axios.delete(`${process.env.REACT_APP_BACKEND_URL}/api/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.filter((user) => user.id !== id));
@@ -162,10 +153,8 @@ const UserManage = () => {
 
     return (
         <div className="users-container">
-            {/* Sidebar Navigation */}
             {userRole === "admin" ? <AdminSidebar /> : <PharmacistSidebar />}
 
-            {/* Main Content */}
             <main className="main-content">
                 <header className="header">
                     <div className="header-left">
@@ -173,14 +162,14 @@ const UserManage = () => {
                         <p>Dashboard / User Management</p>
                     </div>
                     <div className="header-right">
-                        <div onClick={handleAvaterClick} style={{cursor: 'pointer'}}>
-                            <Avatar size={50} icon={<UserOutlined/>}/>
+                        <div onClick={handleAvatarClick} style={{ cursor: "pointer" }}>
+                            <Avatar size={50} icon={<UserOutlined />} />
                         </div>
                     </div>
                 </header>
                 <section className="users-table">
                     <Button
-                        className='add-button'
+                        className="add-button"
                         type="primary"
                         icon={<PlusOutlined />}
                         onClick={() => setIsAddUserVisible(true)}

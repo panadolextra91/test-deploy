@@ -11,7 +11,7 @@ const ForgotPassword = () => {
         const { email } = values;
         setLoading(true);
         try {
-            await axios.post("http://localhost:3000/api/users/forgot-password", { email });
+            await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/users/forgot-password`, { email });
             message.success("A new password has been sent to your email.");
         } catch (error) {
             console.error("Error in forgot password:", error);
