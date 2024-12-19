@@ -65,7 +65,7 @@ app.get('/robots.txt', (req, res) => {
 });
 app.get('/sitemap.xml', (req, res) => {
     res.setHeader('Content-Type', 'application/xml');
-    res.sendFile(path.join(__dirname, '../frontend/sitemap.xml'));
+    res.sendFile(path.join(__dirname, '../frontend/build/sitemap.xml'));
 });
 
 // Logging (only in development)
