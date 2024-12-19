@@ -63,6 +63,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 app.get('/robots.txt', (req, res) => {
     res.sendFile(path.join(__dirname, '../frontend/public/robots.txt'));
 });
+app.get('/sitemap.xml', (req, res) => {
+    res.setHeader('Content-Type', 'application/xml');
+    res.sendFile(path.join(__dirname, '../frontend/sitemap.xml'));
+});
+
 // Logging (only in development)
 if (process.env.NODE_ENV !== 'production') {
     app.use((req, res, next) => {
