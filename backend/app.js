@@ -21,43 +21,17 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
-const allowedOrigins = [
-    'https://medimaster-fe.vercel.app',
-    'http://localhost:3001'
-];
-
-// Log the current environment
-console.log('Current environment:', process.env.NODE_ENV);
-console.log('CLIENT_URL:', process.env.CLIENT_URL);
-
-// Add CLIENT_URL to allowed origins if it exists and isn't already included
-if (process.env.CLIENT_URL && !allowedOrigins.includes(process.env.CLIENT_URL)) {
-    allowedOrigins.push(process.env.CLIENT_URL);
-}
-
-// Enable pre-flight requests for all routes
-app.options('*', cors());
-
-// Configure CORS
 app.use(cors({
-    origin: allowedOrigins,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    origin: 'https://medimaster-fe.vercel.app',
     credentials: true,
-    preflightContinue: false,
-    optionsSuccessStatus: 204
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Add custom headers middleware
-app.use((req, res, next) => {
-    res.header('Access-Control-Allow-Origin', allowedOrigins);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.header('Access-Control-Allow-Credentials', true);
-    next();
-});
+// Enable pre-flight requests
+app.options('*', cors());
 
-console.log("Allowed CORS origins:", allowedOrigins);
+console.log("Allowed CORS origins:", 'https://medimaster-fe.vercel.app');
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
