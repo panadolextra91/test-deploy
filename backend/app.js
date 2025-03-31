@@ -22,7 +22,7 @@ const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-    origin: process.env.CLIENT_URL || '*' || 'http://localhost:3001', // Replace '*' with your frontend domain in production
+    origin: process.env.CLIENT_URL || 'https://medimaster-fe.vercel.app' || 'http://localhost:3001', // Replace '*' with your frontend domain in production
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true,
 }));
