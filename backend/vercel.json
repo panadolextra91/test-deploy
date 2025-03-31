@@ -3,7 +3,10 @@
     "builds": [
         {
             "src": "app.js",
-            "use": "@vercel/node"
+            "use": "@vercel/node",
+            "config": {
+                "includeFiles": ["**/*"]
+            }
         }
     ],
     "routes": [
@@ -18,5 +21,7 @@
                 "Access-Control-Allow-Credentials": "true"
             }
         }
-    ]
+    ],
+    "installCommand": "npm install",
+    "buildCommand": "npm install"
 } 
