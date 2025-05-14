@@ -16,6 +16,7 @@ const AdminDashboard = () => {
     const [sellingMedicinesData, setSellingMedicinesData] = useState([]);
     const navigate = useNavigate();
     const [userName, setUserName] = useState("");
+    const [avatarUrl, setAvatarUrl] = useState(null);
     const [revenueData, setRevenueData] = useState({ income: 0, outcome: 0, total: 0 });
     const [lowStockAlerts, setLowStockAlerts] = useState([]);
     const [nearExpiryAlerts, setNearExpiryAlerts] = useState([]);
@@ -134,6 +135,13 @@ const AdminDashboard = () => {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUserName(response.data.name);
+            // Set avatar URL if it exists
+            if (response.data.avatarUrl) {
+                setAvatarUrl(response.data.avatarUrl);
+                console.log('Setting avatar URL:', response.data.avatarUrl);
+            } else {
+                setAvatarUrl(null);
+            }
         } catch (error) {
             console.error("Failed to fetch user profile:", error);
             message.error("Unable to load user profile.");
@@ -202,7 +210,16 @@ const AdminDashboard = () => {
                         <p>Overview of the pharmacy's current status.</p>
                     </div>
                     <div className="header-right" onClick={handleAvatarClick} style={{cursor: "pointer"}}>
-                        <Avatar size={50} icon={<UserOutlined/>}/>
+                        <Avatar 
+                            size={50} 
+                            icon={!avatarUrl && <UserOutlined />}
+                            src={avatarUrl}
+                            onError={() => {
+                                console.error('Failed to load avatar image');
+                                setAvatarUrl(null);
+                                sessionStorage.removeItem('userAvatarUrl');
+                            }}
+                        />
                     </div>
                 </header>
 

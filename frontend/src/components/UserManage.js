@@ -21,15 +21,47 @@ const UserManage = () => {
     const [isEditUserVisible, setIsEditUserVisible] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [avatarUrl, setAvatarUrl] = useState(() => {
+        // Initialize from sessionStorage if available
+        const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
+        return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+    });
 
     const userRole = sessionStorage.getItem("userRole");
-    const handleAvatarClick = () => {
-        navigate("/profile");
-    };
 
     useEffect(() => {
         fetchUsers();
+        // Only fetch profile if avatar URL is not in sessionStorage
+        if (!sessionStorage.getItem('userAvatarUrl')) {
+            fetchUserProfile();
+        }
     }, []);
+
+    const fetchUserProfile = async () => {
+        const token = sessionStorage.getItem('token');
+        try {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (response.data.avatarUrl) {
+                // Save to sessionStorage
+                sessionStorage.setItem('userAvatarUrl', response.data.avatarUrl);
+                setAvatarUrl(response.data.avatarUrl);
+            } else {
+                sessionStorage.removeItem('userAvatarUrl');
+                setAvatarUrl(null);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            // Don't show error message to user for avatar loading failure
+            setAvatarUrl(null);
+        }
+    };
+
+    const handleAvatarClick = () => {
+        navigate("/profile");
+    };
 
     const fetchUsers = async () => {
         try {
@@ -163,7 +195,15 @@ const UserManage = () => {
                     </div>
                     <div className="header-right">
                         <div onClick={handleAvatarClick} style={{ cursor: "pointer" }}>
-                            <Avatar size={50} icon={<UserOutlined />} />
+                            <Avatar 
+                                size={50} 
+                                icon={!avatarUrl && <UserOutlined />}
+                                src={avatarUrl}
+                                onError={() => {
+                                    setAvatarUrl(null);
+                                    sessionStorage.removeItem('userAvatarUrl');
+                                }}
+                            />
                         </div>
                     </div>
                 </header>

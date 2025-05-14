@@ -16,10 +16,19 @@ const Categories = () => {
     const [categories, setCategories] = useState([]);
     const [currentCategory, setCurrentCategory] = useState(null);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
+    const [avatarUrl, setAvatarUrl] = useState(() => {
+        // Initialize from sessionStorage if available
+        const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
+        return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+    });
 
     // Fetch categories from the backend
     useEffect(() => {
         fetchCategories();
+        // Only fetch profile if avatar URL is not in sessionStorage
+        if (!sessionStorage.getItem('userAvatarUrl')) {
+            fetchUserProfile();
+        }
     }, []);
 
     const handleAvatarClick = () => {
@@ -28,16 +37,38 @@ const Categories = () => {
 
     const userRole = sessionStorage.getItem('userRole');
 
+    const fetchUserProfile = async () => {
+        const token = sessionStorage.getItem('token');
+        try {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (response.data.avatarUrl) {
+                // Save to sessionStorage
+                sessionStorage.setItem('userAvatarUrl', response.data.avatarUrl);
+                setAvatarUrl(response.data.avatarUrl);
+            } else {
+                sessionStorage.removeItem('userAvatarUrl');
+                setAvatarUrl(null);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            // Don't show error message to user for avatar loading failure
+            setAvatarUrl(null);
+        }
+    };
+
     const fetchCategories = async () => {
         try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token'); // Retrieve the token
+            const token = sessionStorage.getItem('token'); // Use sessionStorage consistently
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/categories`, {
                 headers: {
                     Authorization: `Bearer ${token}`
                 }
             });
             const fetchedCategories = response.data.map(category => ({
-                key: category.id, // Map 'id' to 'key' for Ant Design Table
+                key: category.id,
                 category: category.name,
                 des: category.description
             }));
@@ -135,7 +166,15 @@ const Categories = () => {
                     </div>
                     <div className='header-right'>
                         <div onClick={handleAvatarClick} style={{ cursor: 'pointer' }}>
-                            <Avatar size={50} icon={<UserOutlined />} />
+                            <Avatar 
+                                size={50} 
+                                icon={!avatarUrl && <UserOutlined />}
+                                src={avatarUrl}
+                                onError={() => {
+                                    setAvatarUrl(null);
+                                    sessionStorage.removeItem('userAvatarUrl');
+                                }}
+                            />
                         </div>
                     </div>
                 </header>

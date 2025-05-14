@@ -13,6 +13,11 @@ const PharmacistDashboard = () => {
   const [sellingMedicinesData, setSellingMedicinesData] = useState([]);
   const navigate = useNavigate();
   const [userName, setUserName] = useState("");
+  const [avatarUrl, setAvatarUrl] = useState(() => {
+    // Initialize from sessionStorage if available
+    const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
+    return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+  });
   const [revenueData, setRevenueData] = useState({ income: 0, outcome: 0, total: 0 });
   const [lowStockAlerts, setLowStockAlerts] = useState([]);
   const [nearExpiryAlerts, setNearExpiryAlerts] = useState([]);
@@ -31,7 +36,10 @@ const PharmacistDashboard = () => {
     fetchDailyIncome(token);
     fetchRevenueData(token);
     fetchDashboardData(token);
-    fetchUserProfile(token);
+    // Only fetch profile if avatar URL is not in sessionStorage
+    if (!sessionStorage.getItem('userAvatarUrl')) {
+      fetchUserProfile(token);
+    }
   }, [navigate]);
 
   const fetchSellingMedicinesData = async (token) => {
@@ -107,9 +115,18 @@ const PharmacistDashboard = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       setUserName(response.data.name);
+      // Set avatar URL if it exists
+      if (response.data.avatarUrl) {
+        sessionStorage.setItem('userAvatarUrl', response.data.avatarUrl);
+        setAvatarUrl(response.data.avatarUrl);
+      } else {
+        sessionStorage.removeItem('userAvatarUrl');
+        setAvatarUrl(null);
+      }
     } catch (error) {
       console.error("Failed to fetch user profile:", error);
       message.error("Unable to load user profile.");
+      setAvatarUrl(null);
     }
   };
 
@@ -169,7 +186,16 @@ const PharmacistDashboard = () => {
               <p>Overview of the pharmacy's current status.</p>
             </div>
             <div className="header-right" onClick={handleAvatarClick} style={{cursor: "pointer"}}>
-              <Avatar size={50} icon={<UserOutlined/>}/>
+              <Avatar 
+                size={50} 
+                icon={!avatarUrl && <UserOutlined />}
+                src={avatarUrl}
+                onError={() => {
+                  console.error('Failed to load avatar image');
+                  setAvatarUrl(null);
+                  sessionStorage.removeItem('userAvatarUrl');
+                }}
+              />
             </div>
           </header>
 

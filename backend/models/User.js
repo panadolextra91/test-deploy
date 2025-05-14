@@ -1,5 +1,6 @@
 const { Sequelize, DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
+const bcrypt = require('bcrypt');
 //User.js
 const User = sequelize.define('User', {
     id: {
@@ -10,6 +11,7 @@ const User = sequelize.define('User', {
     username: {
         type: DataTypes.STRING,
         allowNull: false,
+        unique: true,
     },
     password: {
         type: DataTypes.STRING,
@@ -22,10 +24,31 @@ const User = sequelize.define('User', {
     email: {
         type: DataTypes.STRING,
         allowNull: false,
+        unique: true,
+        validate: {
+            isEmail: true
+        }
     },
     role: {
-        type: DataTypes.ENUM('pharmacist', 'admin'),
+        type: DataTypes.ENUM('admin', 'pharmacist'),
+        defaultValue: 'pharmacist',
         allowNull: false,
+    },
+    avatar: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: null
+    },
+    avatarPublicId: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: null
+    },
+    avatarUrl: {
+        type: DataTypes.VIRTUAL,
+        get() {
+            return this.avatar; // Now returns the full Cloudinary URL
+        }
     },
     created_at: {
         type: DataTypes.DATE,
@@ -46,7 +69,21 @@ const User = sequelize.define('User', {
             fields: ['email'],
             name: 'users_email_unique'
         }
-    ]
+    ],
+    hooks: {
+        beforeCreate: async (user) => {
+            if (user.password) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
+        },
+        beforeUpdate: async (user) => {
+            if (user.changed('password')) {
+                const salt = await bcrypt.genSalt(10);
+                user.password = await bcrypt.hash(user.password, salt);
+            }
+        }
+    }
 });
 
 module.exports = User;

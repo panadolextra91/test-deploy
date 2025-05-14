@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Modal, Form, Input, Button, Select, DatePicker, Upload, message } from 'antd';
 import { UploadOutlined } from '@ant-design/icons';
 import axios from 'axios';
@@ -8,19 +8,67 @@ const { Option } = Select;
 
 const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, locations }) => {
     const [form] = Form.useForm();
+    const [loading, setLoading] = useState(false);
 
     const handleAdd = async () => {
+        if (loading) return; // Prevent double submission
+        
         try {
+            setLoading(true);
             const values = await form.validateFields();
-            const formattedValues = {
-                ...values,
-                expiry_date: values.expiry_date.format('YYYY-MM-DD') // Format the date
-            };
+            console.log('Form values:', values);
+            
+            // Create FormData object
+            const formData = new FormData();
+            
+            // Add all the text fields
+            formData.append('name', values.name);
+            formData.append('category_id', values.category_id.toString());
+            formData.append('description', values.description || '');
+            formData.append('price', values.price.toString());
+            formData.append('quantity', values.quantity.toString());
+            formData.append('supplier_id', values.supplier_id.toString());
+            formData.append('location_id', values.location_id.toString());
+            formData.append('expiry_date', values.expiry_date.format('YYYY-MM-DD'));
 
-            onCreate(formattedValues); // Pass formatted values to onCreate
-            form.resetFields();
+            // Add the image file if it exists
+            if (values.image && values.image[0] && values.image[0].originFileObj) {
+                formData.append('image', values.image[0].originFileObj);
+            }
+
+            // Log FormData contents (for debugging)
+            for (let pair of formData.entries()) {
+                console.log(pair[0] + ': ' + pair[1]);
+            }
+
+            // Send the request
+            const token = sessionStorage.getItem('token');
+            const response = await axios.post(
+                `${process.env.REACT_APP_BACKEND_URL}/api/medicines`,
+                formData,
+                {
+                    headers: {
+                        'Content-Type': 'multipart/form-data',
+                        'Authorization': `Bearer ${token}`
+                    }
+                }
+            );
+
+            if (response.data) {
+                message.success('Medicine added successfully');
+                onCreate(response.data);
+                form.resetFields();
+                onCancel(); // Close the modal after successful submission
+            }
         } catch (error) {
-            message.error('Failed to add medicine.');
+            console.error('Error adding medicine:', error);
+            console.error('Error details:', {
+                message: error.message,
+                response: error.response?.data
+            });
+            message.error(error.response?.data?.error || 'Failed to add medicine.');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -36,6 +84,8 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                 onCancel();
             }}
             onOk={handleAdd}
+            confirmLoading={loading}
+            okButtonProps={{ loading }}
         >
             <Form
                 form={form}
@@ -46,9 +96,20 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                     name="image"
                     label="Medicine Image"
                     valuePropName="fileList"
-                    getValueFromEvent={(e) => e.fileList}
+                    getValueFromEvent={(e) => {
+                        if (Array.isArray(e)) {
+                            return e;
+                        }
+                        return e?.fileList;
+                    }}
                 >
-                    <Upload name="logo" listType="picture" beforeUpload={() => false}>
+                    <Upload 
+                        name="image"
+                        listType="picture"
+                        maxCount={1}
+                        beforeUpload={() => false}
+                        accept="image/*"
+                    >
                         <Button icon={<UploadOutlined />}>Upload Image</Button>
                     </Upload>
                 </Form.Item>
@@ -66,7 +127,7 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                 >
                     <Select placeholder="Select a category">
                         {categories.map((category) => (
-                            <Option key={category.id} value={category.id}>{category.name}</Option> // Ensure unique key
+                            <Option key={category.id} value={category.id}>{category.name}</Option>
                         ))}
                     </Select>
                 </Form.Item>
@@ -98,7 +159,7 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                 >
                     <Select placeholder="Select supplier">
                         {suppliers.map((supplier) => (
-                            <Option key={supplier.id} value={supplier.id}>{supplier.name}</Option> // Ensure unique key
+                            <Option key={supplier.id} value={supplier.id}>{supplier.name}</Option>
                         ))}
                     </Select>
                 </Form.Item>
@@ -109,7 +170,7 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                 >
                     <Select placeholder="Select location">
                         {locations.map((location) => (
-                            <Option key={location.id} value={location.id}>{location.name}</Option> // Ensure unique key
+                            <Option key={location.id} value={location.id}>{location.name}</Option>
                         ))}
                     </Select>
                 </Form.Item>

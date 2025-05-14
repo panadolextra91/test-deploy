@@ -1,5 +1,19 @@
 {
-  "dependencies": {
-    "react-scripts": "^5.0.1"
+  "name": "medimaster",
+  "version": "1.0.0",
+  "description": "MediMaster - Pharmacy Management System",
+  "main": "index.js",
+  "scripts": {
+    "start": "node backend/app.js",
+    "backend": "cd backend && npm run dev",
+    "frontend": "cd frontend && npm start",
+    "dev": "concurrently \"npm run backend\" \"npm run frontend\"",
+    "install-all": "npm install && cd backend && npm install && cd ../frontend && npm install"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

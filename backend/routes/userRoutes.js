@@ -3,6 +3,7 @@ const userController = require('../controllers/userController');
 const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/authorizeMiddleware'); // Role-based authorization middleware
 const router = express.Router();
+const upload = require('../middleware/uploadMiddleware');
 //userRoutes.js
 // Define routes
 router.get('/', authenticateToken, authorize('admin'), userController.getAllUsers);
@@ -15,4 +16,7 @@ router.post('/forgot-password', userController.forgotPassword);
 router.get('/:id', userController.getUserById); // Get user by ID
 router.delete('/:id', userController.deleteUser); // Delete user by ID
 router.put('/:id', userController.editUserById); //for admin to edit user, not user edit themselves
+// Avatar routes
+router.post('/avatar', authenticateToken, upload.single('avatar'), userController.updateAvatar);
+router.delete('/avatar', authenticateToken, userController.deleteAvatar);
 module.exports = router;

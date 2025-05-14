@@ -1,0 +1,28 @@
+.medicine-image-section {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.medicine-image-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+}
+
+.medicine-image {
+    max-width: 200px;
+    max-height: 200px;
+    object-fit: contain;
+    border-radius: 4px;
+    border: 1px solid #d9d9d9;
+    padding: 4px;
+}
+
+.delete-image-button {
+    margin-top: 8px;
+}
+
+.ant-upload-select {
+    display: inline-block;
+} 

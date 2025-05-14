@@ -20,9 +20,18 @@ const Suppliers = () => {
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [currentSupplier, setCurrentSupplier] = useState(null);
+    const [avatarUrl, setAvatarUrl] = useState(() => {
+        // Initialize from sessionStorage if available
+        const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
+        return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+    });
 
     useEffect(() => {
         fetchSuppliers();
+        // Only fetch profile if avatar URL is not in sessionStorage
+        if (!sessionStorage.getItem('userAvatarUrl')) {
+            fetchUserProfile();
+        }
     }, []);
 
     const handleAvatarClick = () => {
@@ -31,9 +40,31 @@ const Suppliers = () => {
 
     const userRole = sessionStorage.getItem('userRole');
 
+    const fetchUserProfile = async () => {
+        const token = sessionStorage.getItem('token');
+        try {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (response.data.avatarUrl) {
+                // Save to sessionStorage
+                sessionStorage.setItem('userAvatarUrl', response.data.avatarUrl);
+                setAvatarUrl(response.data.avatarUrl);
+            } else {
+                sessionStorage.removeItem('userAvatarUrl');
+                setAvatarUrl(null);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            // Don't show error message to user for avatar loading failure
+            setAvatarUrl(null);
+        }
+    };
+
     const fetchSuppliers = async () => {
         try {
-            const token = localStorage.getItem('token') || sessionStorage.getItem('token');
+            const token = sessionStorage.getItem('token'); // Use sessionStorage consistently
             const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/suppliers`, {
                 headers: {
                     Authorization: `Bearer ${token}`
@@ -177,7 +208,15 @@ const Suppliers = () => {
                     </div>
                     <div className='header-right'>
                         <div onClick={handleAvatarClick} style={{cursor: 'pointer'}}>
-                            <Avatar size={50} icon={<UserOutlined/>}/>
+                            <Avatar 
+                                size={50} 
+                                icon={!avatarUrl && <UserOutlined />}
+                                src={avatarUrl}
+                                onError={() => {
+                                    setAvatarUrl(null);
+                                    sessionStorage.removeItem('userAvatarUrl');
+                                }}
+                            />
                         </div>
                     </div>
                 </header>

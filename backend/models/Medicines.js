@@ -1,4 +1,3 @@
-// models/Medicines.js
 const { DataTypes } = require('sequelize');
 const sequelize = require('../config/database');
 const Location = require('./Location'); // Import Location model
@@ -37,9 +36,21 @@ const Medicine = sequelize.define('Medicine', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
-    image_url: {
+    image: {
         type: DataTypes.STRING,
         allowNull: true,
+        defaultValue: null,
+    },
+    imagePublicId: {
+        type: DataTypes.STRING,
+        allowNull: true,
+        defaultValue: null,
+    },
+    imageUrl: {
+        type: DataTypes.VIRTUAL,
+        get() {
+            return this.image;
+        }
     },
     expiry_date: {
         type: DataTypes.DATE,

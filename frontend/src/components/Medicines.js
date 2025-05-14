@@ -27,6 +27,11 @@ const Medicines = () => {
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingMedicine, setEditingMedicine] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [avatarUrl, setAvatarUrl] = useState(() => {
+        // Initialize from sessionStorage if available
+        const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
+        return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+    });
 
     const onSearch = async (value) => {
         const token = sessionStorage.getItem('token');
@@ -54,11 +59,16 @@ const Medicines = () => {
         fetchCategories();
         fetchSuppliers();
         fetchLocations();
+        // Only fetch profile if avatar URL is not in sessionStorage
+        if (!sessionStorage.getItem('userAvatarUrl')) {
+            fetchUserProfile();
+        }
     }, []);
 
-    const handleAvaterClick = () => {
+    const handleAvatarClick = () => {
         navigate('/profile');
-    }
+    };
+
     const role = sessionStorage.getItem('userRole');
 
     const fetchMedicines = async () => {
@@ -111,6 +121,28 @@ const Medicines = () => {
         }
     };
 
+    const fetchUserProfile = async () => {
+        const token = sessionStorage.getItem('token');
+        try {
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            
+            if (response.data.avatarUrl) {
+                // Save to sessionStorage
+                sessionStorage.setItem('userAvatarUrl', response.data.avatarUrl);
+                setAvatarUrl(response.data.avatarUrl);
+            } else {
+                sessionStorage.removeItem('userAvatarUrl');
+                setAvatarUrl(null);
+            }
+        } catch (error) {
+            console.error("Failed to fetch user profile:", error);
+            // Don't show error message to user for avatar loading failure
+            setAvatarUrl(null);
+        }
+    };
+
     const showAddMedicineModal = () => {
         setIsAddModalVisible(true);
     };
@@ -120,64 +152,40 @@ const Medicines = () => {
         setIsEditModalVisible(true);
     };
 
-    const handleAddMedicine = async (values) => {
+    const handleAddMedicine = async (newMedicine) => {
         try {
-            const token = sessionStorage.getItem('token');
-            const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/medicines`, values, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setMedicines([...medicines, response.data]); // Add new medicine to state
-            message.success("Medicine added successfully.");
+            // Find the names for the IDs
+            const category = categories.find(cat => cat.id === newMedicine.category_id);
+            const supplier = suppliers.find(sup => sup.id === newMedicine.supplier_id);
+            const location = locations.find(loc => loc.id === newMedicine.location_id);
+
+            // Format the medicine data with names instead of IDs
+            const formattedMedicine = {
+                ...newMedicine,
+                category: category ? category.name : 'N/A',
+                supplier: supplier ? supplier.name : 'N/A',
+                location: location ? location.name : 'N/A'
+            };
+
+            setMedicines([...medicines, formattedMedicine]);
             setIsAddModalVisible(false);
         } catch (error) {
-            message.error("Failed to add medicine.");
+            console.error("Error formatting medicine data:", error);
+            message.error("Failed to add medicine. Please try again.");
         }
     };
 
     const handleEditMedicine = async (updatedMedicine) => {
         try {
-            const token = sessionStorage.getItem('token');
-
-            const category = categories.find(cat => cat.name === updatedMedicine.category);
-            const supplier = suppliers.find(sup => sup.name === updatedMedicine.supplier);
-            const location = locations.find(loc => loc.name === updatedMedicine.location);
-
-            if (!category || !supplier || !location) {
-                message.error("Invalid category, supplier, or location.");
-                return;
-            }
-
-            const payload = {
-                name: updatedMedicine.name,
-                category_id: category.id,
-                description: updatedMedicine.description,
-                price: updatedMedicine.price,
-                quantity: updatedMedicine.quantity,
-                supplier_id: supplier.id,
-                location_id: location.id,
-                expiry_date: updatedMedicine.expirationDate
-                    ? moment(updatedMedicine.expirationDate).format('YYYY-MM-DD')
-                    : null,
-            };
-
-            const response = await axios.put(
-                `${process.env.REACT_APP_BACKEND_URL}/api/medicines/${updatedMedicine.id}`,
-                payload,
-                {
-                    headers: { Authorization: `Bearer ${token}` }
-                }
-            );
-
+            // Update the local state with the updated medicine data
             const updatedMedicines = medicines.map(med =>
-                med.id === updatedMedicine.id ? { ...med, ...response.data } : med
+                med.id === updatedMedicine.id ? updatedMedicine : med
             );
             setMedicines(updatedMedicines);
-
-            message.success("Medicine updated successfully.");
             setIsEditModalVisible(false);
         } catch (error) {
             console.error("Error updating medicine:", error);
-            message.error("Failed to update medicine. Please try again.");
+            message.error("Failed to update medicine state. Please refresh the page.");
         }
     };
 
@@ -200,6 +208,41 @@ const Medicines = () => {
     };
 
     const columns = [
+        {
+            title: 'Image',
+            key: 'image',
+            width: 100,
+            render: (record) => (
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    {record.imageUrl ? (
+                        <img
+                            src={record.imageUrl}
+                            alt={record.name}
+                            style={{
+                                width: '50px',
+                                height: '50px',
+                                objectFit: 'cover',
+                                borderRadius: '4px'
+                            }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                width: '50px',
+                                height: '50px',
+                                background: '#f5f5f5',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '4px'
+                            }}
+                        >
+                            No Image
+                        </div>
+                    )}
+                </div>
+            )
+        },
         {
             title: 'Medicine Name',
             dataIndex: 'name',
@@ -281,8 +324,16 @@ const Medicines = () => {
                         <p>Dashboard / Medicines</p>
                     </div>
                     <div className='header-right'>
-                        <div onClick={handleAvaterClick} style={{cursor: 'pointer'}}>
-                            <Avatar size={50} icon={<UserOutlined/>}/>
+                        <div onClick={handleAvatarClick} style={{cursor: 'pointer'}}>
+                        <Avatar 
+                            size={50} 
+                            icon={!avatarUrl && <UserOutlined />}
+                            src={avatarUrl}
+                            onError={() => {
+                                setAvatarUrl(null);
+                                sessionStorage.removeItem('userAvatarUrl');
+                            }}
+                        />
                         </div>
                     </div>
                 </header>
@@ -310,7 +361,7 @@ const Medicines = () => {
                 <AddMedicineForm visible={isAddModalVisible} onCreate={handleAddMedicine} onCancel={handleCancel}
                                  categories={categories} suppliers={suppliers} locations={locations}/>
                 <EditMedicineForm visible={isEditModalVisible} onEdit={handleEditMedicine} onCancel={handleCancel}
-                                  medicine={editingMedicine} suppliers={suppliers} locations={locations}/>
+                                  medicine={editingMedicine} suppliers={suppliers} locations={locations} categories={categories}/>
             </main>
         </div>
     );
