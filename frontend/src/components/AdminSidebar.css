@@ -44,7 +44,7 @@
 
 /* Align icons and text vertically in the list items */
 .sidebar nav ul li {
-    display: flex;
+    display: block;
     align-items: center;
     margin: 15px 0;
     padding: 0;
@@ -73,3 +73,38 @@
     margin-right: 10px;
     font-size: larger;
 }
+
+.submenu-toggle a {
+    display: flex; /* Allow icon and text to be inline */
+    align-items: center; /* Center vertically */
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+    padding: 10px;
+    border-radius: 50px;
+    transition: 0.3s ease-in-out;
+    margin-left: -20px;
+}
+
+.submenu {
+    list-style-type: none;
+    padding-left: 20px;
+}
+
+.submenu li a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+    color: #333;
+    font-weight: 600;
+    border-radius: 50px;
+    transition: 0.3s ease-in-out;
+}
+
+.submenu li a:hover {
+    background-color: #333;
+    color: #e5e7eb;
+    scale: 1.05;
+}
+
+

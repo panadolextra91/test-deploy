@@ -13,7 +13,11 @@ const InvoiceItem = sequelize.define('InvoiceItem', {
     },
     medicine_id: {
         type: DataTypes.INTEGER,
-        allowNull: false,
+        allowNull: true, // Now nullable for purchase invoices
+    },
+    product_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true, // Only used for purchase invoices
     },
     quantity: {
         type: DataTypes.INTEGER,

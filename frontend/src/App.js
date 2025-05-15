@@ -11,6 +11,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import UserManage from "./components/UserManage";
 import CustomerManage from "./components/CustomerManage";
 import ForgotPassword from "./components/ForgotPassword";
+import Products from "./components/Products";
 
 function App() {
     const ProtectedRoute = ({ children, roles }) => {
@@ -66,6 +67,11 @@ function App() {
                 <Route path='/suppliers' element={
                     <ProtectedRoute roles={['pharmacist', 'admin']}>
                         <Suppliers />
+                    </ProtectedRoute>
+                } />
+                <Route path='/products' element={
+                    <ProtectedRoute roles={['pharmacist', 'admin']}>
+                        <Products />
                     </ProtectedRoute>
                 } />
                 <Route path='/sales-invoices' element={

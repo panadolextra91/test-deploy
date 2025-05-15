@@ -51,5 +51,12 @@ router.post(
     productController.emailBulkOrder
   );
   
+// Filter products by supplier and month
+router.get(
+  '/filter',
+  authenticate,
+  authorize('admin', 'pharmacist'),
+  productController.filterBySupplierAndMonth
+);
 
 module.exports = router;

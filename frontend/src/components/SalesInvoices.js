@@ -73,7 +73,9 @@ const SalesInvoices = () => {
                 totalAmount: Number(invoice.total_amount),
                 items: invoice.items.map((item) => ({
                     ...item,
-                    name: item.medicine.name,
+                    name: item.medicine?.name || item.product?.name || "N/A",
+                    brand: item.product?.brand || "",
+                    supplier: item.product?.supplier?.name || "",
                 })),
             }));
             setInvoices(fetchedInvoices);

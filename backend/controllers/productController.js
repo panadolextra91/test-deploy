@@ -35,7 +35,7 @@ exports.searchProducts = async (req, res) => {
   }
 };
 
-// 3) Bulk import products from CSV
+// 3) Bulk import products from CSV (no upsert — allows monthly snapshot)
 exports.importCsv = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
   try {
@@ -46,17 +46,18 @@ exports.importCsv = async (req, res) => {
       const { supplierName, brand, name, price, expiry_date } = row;
       const supplier = await Supplier.findOne({ where: { name: supplierName } });
       if (!supplier) continue;
-      await Product.upsert({
+
+      await Product.create({
         supplier_id: supplier.id,
         brand,
         name,
         price: parseFloat(price),
-        expiry_date: new Date(expiry_date)
-      }, {
-        where: { supplier_id: supplier.id, brand, name }
+        expiry_date: new Date(expiry_date),
+        // created_at will be automatically set if timestamps are enabled
       });
       imported++;
     }
+
     await fs.unlink(req.file.path);
     res.json({ imported });
   } catch (err) {
@@ -132,4 +133,34 @@ exports.emailBulkOrder = async (req, res) => {
     res.status(500).json({ error: 'Failed to send order email', details: err.message });
   }
 };
+
+// 5) Filter products by supplier and month
+exports.filterBySupplierAndMonth = async (req, res) => {
+  try {
+    const { supplierId, month } = req.query;
+
+    const where = {};
+    if (supplierId) where.supplier_id = supplierId;
+
+    if (month) {
+      const [year, m] = month.split('-');
+      const start = new Date(year, m - 1, 1);
+      const end = new Date(year, m, 1); // first day of next month
+
+      where.created_at = { [Op.gte]: start, [Op.lt]: end };
+    }
+
+    const products = await Product.findAll({
+      where,
+      include: [{ model: Supplier, attributes: ['id', 'name'] }],
+      order: [['created_at', 'DESC']]
+    });
+
+    res.json(products);
+  } catch (err) {
+    console.error('Error filtering products:', err);
+    res.status(500).json({ error: 'Failed to filter products' });
+  }
+};
+
 

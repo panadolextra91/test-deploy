@@ -8,13 +8,17 @@ import {
     UserOutlined,
     LoginOutlined,
     TruckOutlined,
+    DownOutlined    
 } from '@ant-design/icons';
+import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
+import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
 import logo from '../imgs/trace.svg'; // Replace with the correct path to your logo file
 import './AdminSidebar.css';
 import {useNavigate} from "react-router-dom"; // Optional: Import CSS for styling if needed
 
 const AdminSidebar = () => {
     const navigate = useNavigate();
+    const [supplierOpen, setSupplierOpen] = React.useState(false);
     const handleLogout = () => {
         sessionStorage.clear();
         localStorage.clear();
@@ -53,9 +57,20 @@ const AdminSidebar = () => {
                         </a>
                     </li>
                     <li>
-                        <a href="/suppliers">
-                            <TruckOutlined /> Suppliers
-                        </a>
+                        <div
+                            className="submenu-toggle"
+                            onClick={() => setSupplierOpen(!supplierOpen)}
+                        >
+                            <a href="#">
+                                <TruckOutlined /> Supplies <DownOutlined style={{marginLeft: "10px", fontSize: "12px"}}/>
+                            </a>
+                        </div>
+                        {supplierOpen && (
+                            <ul className="submenu">
+                                <li><a href="/suppliers"><ContactMailOutlinedIcon style={{marginRight: "10px", fontSize: "19px"}}/>Supplier List</a></li>
+                                <li><a href="/products"><InventoryOutlinedIcon style={{marginRight: "10px", fontSize: "19px"}}/>Product List</a></li>
+                            </ul>
+                        )}
                     </li>
                     <li>
                         <a href="/sales-invoices">

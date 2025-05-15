@@ -1,6 +1,6 @@
 // invoiceController.js
 
-const { Invoice, InvoiceItem, Medicine, Customer } = require('../models'); // Ensure models are imported
+const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier } = require('../models'); // Ensure models are imported
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -21,7 +21,10 @@ exports.getAllInvoices = async (req, res) => {
                 {
                     model: InvoiceItem,
                     as: 'items',
-                    include: [{ model: Medicine, as: 'medicine' }],
+                    include: [
+                      { model: Medicine, as: 'medicine' },
+                      { model: Product, as: 'product', include: [{ model: Supplier, as: 'supplier' }] }
+                    ],
                 },
                 {
                     model: Customer,
@@ -45,10 +48,15 @@ exports.getInvoiceById = async (req, res) => {
                 model: InvoiceItem,
                 as: 'items',
                 include: [
-                    {
-                        model: Medicine,
-                        as: 'medicine' // Make sure the alias matches your association
-                    }
+                  {
+                    model: Medicine,
+                    as: 'medicine'
+                  },
+                  {
+                    model: Product,
+                    as: 'product',
+                    include: [{ model: Supplier, as: 'supplier' }]
+                  }
                 ]
             }
         });
@@ -90,67 +98,98 @@ exports.createInvoice = async (req, res) => {
             return res.status(400).json({ error: 'Invoice must contain at least one item.' });
         }
 
-        // Fetch all medicines involved in the invoice
-        const medicineIds = items.map(item => item.medicine_id);
-        const medicines = await Medicine.findAll({
-            where: { id: { [Op.in]: medicineIds } },
-            transaction,
-            lock: transaction.LOCK.UPDATE, // Lock the selected rows for update
-        });
+        let totalAmount = 0;
+        let invoice;
 
-        // Validate all medicines exist
-        if (medicines.length !== medicineIds.length) {
-            const foundIds = medicines.map(med => med.id);
-            const missingIds = medicineIds.filter(id => !foundIds.includes(id));
-            await transaction.rollback();
-            return res.status(404).json({ error: `Medicines not found with IDs: ${missingIds.join(', ')}` });
-        }
+        if (type === 'sale') {
+            // SALE: Handle medicines
+            const medicineIds = items.map(item => item.medicine_id);
+            const medicines = await Medicine.findAll({
+                where: { id: { [Op.in]: medicineIds } },
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            });
 
-        // Validate stock availability based on invoice type
-        for (const item of items) {
-            const medicine = medicines.find(med => med.id === item.medicine_id);
-            if (type === 'sale') {
+            // Validate all medicines exist
+            if (medicines.length !== medicineIds.length) {
+                const foundIds = medicines.map(med => med.id);
+                const missingIds = medicineIds.filter(id => !foundIds.includes(id));
+                await transaction.rollback();
+                return res.status(404).json({ error: `Medicines not found with IDs: ${missingIds.join(', ')}` });
+            }
+
+            // Validate stock availability
+            for (const item of items) {
+                const medicine = medicines.find(med => med.id === item.medicine_id);
                 if (item.quantity > medicine.quantity) {
                     await transaction.rollback();
                     return res.status(400).json({ error: `Insufficient stock for medicine "${medicine.name}". Available: ${medicine.quantity}, Requested: ${item.quantity}` });
                 }
             }
-            // For 'purchase', no need to validate stock as it will increase
-        }
 
-        // Calculate total amount
-        const totalAmount = items.reduce((sum, item) => {
-            const medicine = medicines.find(med => med.id === item.medicine_id);
-            return sum + (medicine.price * item.quantity);
-        }, 0);
+            totalAmount = items.reduce((sum, item) => {
+                const medicine = medicines.find(med => med.id === item.medicine_id);
+                return sum + (medicine.price * item.quantity);
+            }, 0);
 
-        // Create the invoice
-        const invoice = await Invoice.create({ invoice_date, type, total_amount: totalAmount, customer_id }, { transaction });
+            invoice = await Invoice.create({ invoice_date, type, total_amount: totalAmount, customer_id }, { transaction });
 
-        // Create invoice items and update medicine stock
-        for (const item of items) {
-            const medicine = medicines.find(med => med.id === item.medicine_id);
+            for (const item of items) {
+                const medicine = medicines.find(med => med.id === item.medicine_id);
+                await InvoiceItem.create({
+                    invoice_id: invoice.id,
+                    medicine_id: item.medicine_id,
+                    quantity: item.quantity,
+                    price: medicine.price,
+                }, { transaction });
 
-            // Create InvoiceItem
-            await InvoiceItem.create({
-                invoice_id: invoice.id,
-                medicine_id: item.medicine_id,
-                quantity: item.quantity,
-                price: medicine.price,
-            }, { transaction });
+                // Update Medicine stock
+                const updatedQuantity = medicine.quantity - item.quantity;
+                await Medicine.update(
+                    { quantity: updatedQuantity },
+                    { where: { id: medicine.id }, transaction }
+                );
+            }
+        } else {
+            // PURCHASE: Handle products
+            const productIds = items.map(item => item.product_id);
+            const products = await Product.findAll({
+                where: { id: { [Op.in]: productIds } },
+                transaction,
+                lock: transaction.LOCK.UPDATE,
+            });
 
-            // Update Medicine stock based on invoice type
-            let updatedQuantity;
-            if (type === 'sale') {
-                updatedQuantity = medicine.quantity - item.quantity;
-            } else { // 'purchase'
-                updatedQuantity = medicine.quantity + item.quantity;
+            // Validate all products exist
+            if (products.length !== productIds.length) {
+                const foundIds = products.map(prod => prod.id);
+                const missingIds = productIds.filter(id => !foundIds.includes(id));
+                await transaction.rollback();
+                return res.status(404).json({ error: `Products not found with IDs: ${missingIds.join(', ')}` });
             }
 
-            await Medicine.update(
-                { quantity: updatedQuantity },
-                { where: { id: medicine.id }, transaction }
-            );
+            totalAmount = items.reduce((sum, item) => {
+                const product = products.find(prod => prod.id === item.product_id);
+                return sum + (product.price * item.quantity);
+            }, 0);
+
+            invoice = await Invoice.create({ invoice_date, type, total_amount: totalAmount, customer_id }, { transaction });
+
+            for (const item of items) {
+                const product = products.find(prod => prod.id === item.product_id);
+                await InvoiceItem.create({
+                    invoice_id: invoice.id,
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    price: product.price,
+                }, { transaction });
+
+                // Update Product stock (increase)
+                const updatedQuantity = (product.quantity || 0) + item.quantity;
+                await Product.update(
+                    { quantity: updatedQuantity },
+                    { where: { id: product.id }, transaction }
+                );
+            }
         }
 
         await transaction.commit();
@@ -188,47 +227,60 @@ exports.updateInvoice = async (req, res) => {
             return res.status(404).json({error: 'Invoice not found'});
         }
 
-        // Fetch all medicines involved in the new items
-        const medicineIds = items.map(item => item.medicine_id);
-        const medicines = await Medicine.findAll({
-            where: {id: {[Op.in]: medicineIds}},
+        // Determine which model to use based on invoice type
+        let entityModel, entityIds, entityKey;
+        if (type === 'sale') {
+            entityIds = items.map(item => item.medicine_id);
+            entityModel = Medicine;
+            entityKey = 'medicine_id';
+        } else { // purchase
+            entityIds = items.map(item => item.product_id);
+            entityModel = Product;
+            entityKey = 'product_id';
+        }
+
+        // Fetch all entities involved in the new items
+        const entities = await entityModel.findAll({
+            where: {id: {[Op.in]: entityIds}},
             transaction,
             lock: transaction.LOCK.UPDATE, // Lock the selected rows for update
         });
 
-        // Validate all medicines exist
-        if (medicines.length !== medicineIds.length) {
-            const foundIds = medicines.map(med => med.id);
-            const missingIds = medicineIds.filter(id => !foundIds.includes(id));
+        // Validate all entities exist
+        if (entities.length !== entityIds.length) {
+            const foundIds = entities.map(entity => entity.id);
+            const missingIds = entityIds.filter(id => !foundIds.includes(id));
             await transaction.rollback();
-            return res.status(404).json({error: `Medicines not found with IDs: ${missingIds.join(', ')}`});
+            return res.status(404).json({error: `${type === 'sale' ? 'Medicines' : 'Products'} not found with IDs: ${missingIds.join(', ')}`});
         }
 
-        // Map existing invoice items by medicine_id for easy access
+        // Map existing invoice items by entity_id for easy access
         const existingItemsMap = {};
         invoice.items.forEach(item => {
-            existingItemsMap[item.medicine_id] = item;
+            if (item[entityKey]) {
+                existingItemsMap[item[entityKey]] = item;
+            }
         });
 
         // Validate stock availability and calculate stock changes based on invoice type
         for (const newItem of items) {
-            const medicine = medicines.find(med => med.id === newItem.medicine_id);
-            const existingItem = existingItemsMap[newItem.medicine_id];
+            const entity = entities.find(e => e.id === newItem[entityKey]);
+            const existingItem = existingItemsMap[newItem[entityKey]];
 
             if (existingItem) {
                 const quantityDifference = newItem.quantity - existingItem.quantity;
                 if (type === 'sale') {
-                    if (quantityDifference > 0 && quantityDifference > medicine.quantity) {
+                    if (quantityDifference > 0 && quantityDifference > entity.quantity) {
                         await transaction.rollback();
-                        return res.status(400).json({error: `Insufficient stock for medicine "${medicine.name}". Available: ${medicine.quantity}, Requested Increase: ${quantityDifference}`});
+                        return res.status(400).json({error: `Insufficient stock for ${type === 'sale' ? 'medicine' : 'product'} "${entity.name}". Available: ${entity.quantity}, Requested Increase: ${quantityDifference}`});
                     }
                 }
                 // For 'purchase', no need to validate as stock will increase
             } else {
-                // New medicine being added to the invoice
-                if (type === 'sale' && newItem.quantity > medicine.quantity) {
+                // New item being added to the invoice
+                if (type === 'sale' && newItem.quantity > entity.quantity) {
                     await transaction.rollback();
-                    return res.status(400).json({error: `Insufficient stock for medicine "${medicine.name}". Available: ${medicine.quantity}, Requested: ${newItem.quantity}`});
+                    return res.status(400).json({error: `Insufficient stock for ${type === 'sale' ? 'medicine' : 'product'} "${entity.name}". Available: ${entity.quantity}, Requested: ${newItem.quantity}`});
                 }
             }
         }
@@ -242,8 +294,8 @@ exports.updateInvoice = async (req, res) => {
 
         // Process each new item
         for (const newItem of items) {
-            const medicine = medicines.find(med => med.id === newItem.medicine_id);
-            const existingItem = existingItemsMap[newItem.medicine_id];
+            const entity = entities.find(e => e.id === newItem[entityKey]);
+            const existingItem = existingItemsMap[newItem[entityKey]];
 
             if (existingItem) {
                 const quantityDifference = newItem.quantity - existingItem.quantity;
@@ -251,71 +303,72 @@ exports.updateInvoice = async (req, res) => {
                 // Update the existing invoice item
                 await existingItem.update({
                     quantity: newItem.quantity,
-                    price: medicine.price, // Assuming price remains consistent
+                    price: entity.price, // Assuming price remains consistent
                 }, {transaction});
 
-                // Adjust medicine stock based on invoice type and quantity difference
+                // Adjust entity stock based on invoice type and quantity difference
                 let updatedQuantity;
                 if (type === 'sale') {
-                    updatedQuantity = medicine.quantity - quantityDifference;
+                    updatedQuantity = entity.quantity - quantityDifference;
                 } else { // 'purchase'
-                    updatedQuantity = medicine.quantity + quantityDifference;
+                    updatedQuantity = entity.quantity + quantityDifference;
                 }
 
-                await Medicine.update(
+                await entityModel.update(
                     {quantity: updatedQuantity},
-                    {where: {id: medicine.id}, transaction}
+                    {where: {id: entity.id}, transaction}
                 );
 
                 // Remove from the map as it's already processed
-                delete existingItemsMap[newItem.medicine_id];
+                delete existingItemsMap[newItem[entityKey]];
             } else {
                 // New invoice item
-                await InvoiceItem.create({
+                const newItemData = {
                     invoice_id: invoice.id,
-                    medicine_id: newItem.medicine_id,
                     quantity: newItem.quantity,
-                    price: medicine.price,
-                }, {transaction});
+                    price: entity.price,
+                };
+                newItemData[entityKey] = newItem[entityKey];
+                await InvoiceItem.create(newItemData, {transaction});
 
-                // Adjust medicine stock based on invoice type
+                // Adjust entity stock based on invoice type
                 let updatedQuantity;
                 if (type === 'sale') {
-                    updatedQuantity = medicine.quantity - newItem.quantity;
+                    updatedQuantity = entity.quantity - newItem.quantity;
                 } else { // 'purchase'
-                    updatedQuantity = medicine.quantity + newItem.quantity;
+                    updatedQuantity = entity.quantity + newItem.quantity;
                 }
 
-                await Medicine.update(
+                await entityModel.update(
                     {quantity: updatedQuantity},
-                    {where: {id: medicine.id}, transaction}
+                    {where: {id: entity.id}, transaction}
                 );
             }
 
             // Accumulate total amount
-            newTotalAmount += newItem.quantity * medicine.price;
+            newTotalAmount += newItem.quantity * entity.price;
         }
 
         // Any remaining items in existingItemsMap have been removed from the invoice
-        for (const [medicine_id, existingItem] of Object.entries(existingItemsMap)) {
-            // Adjust medicine stock based on invoice type
-            const medicine = medicines.find(med => med.id === parseInt(medicine_id));
+        for (const [entityId, existingItem] of Object.entries(existingItemsMap)) {
+            // Adjust entity stock based on invoice type
+            const entity = entities.find(e => e.id === parseInt(entityId));
             let updatedQuantity;
             if (type === 'sale') {
-                updatedQuantity = medicine.quantity + existingItem.quantity;
+                updatedQuantity = entity.quantity + existingItem.quantity;
             } else { // 'purchase'
-                updatedQuantity = medicine.quantity - existingItem.quantity;
+                updatedQuantity = entity.quantity - existingItem.quantity;
             }
 
             // For 'purchase', ensure stock doesn't go negative
             if (type === 'purchase' && updatedQuantity < 0) {
                 await transaction.rollback();
-                return res.status(400).json({error: `Cannot remove ${existingItem.quantity} of "${medicine.name}" from invoice. It would result in negative stock.`});
+                return res.status(400).json({error: `Cannot remove ${existingItem.quantity} of "${entity.name}" from invoice. It would result in negative stock.`});
             }
 
-            await Medicine.update(
+            await entityModel.update(
                 {quantity: updatedQuantity},
-                {where: {id: medicine.id}, transaction}
+                {where: {id: entity.id}, transaction}
             );
 
             // Delete the invoice item
@@ -329,8 +382,8 @@ exports.updateInvoice = async (req, res) => {
         res.status(200).json(invoice);
     } catch (error) {
         await transaction.rollback();
-        console.error('Error editing invoice:', error);
-        res.status(500).json({ error: 'Failed to edit invoice' });
+        console.error('Error updating invoice:', error);
+        res.status(500).json({ error: 'Failed to update invoice' });
     }
 };
 

@@ -203,8 +203,8 @@ const Suppliers = () => {
             <main className="main-content">
                 <header className="header">
                     <div className='header-left'>
-                        <h1>Suppliers Management</h1>
-                        <p>Dashboard / Suppliers</p>
+                        <h1>Suppliers</h1>
+                        <p>Dashboard / Supplies / Supplier List</p>
                     </div>
                     <div className='header-right'>
                         <div onClick={handleAvatarClick} style={{cursor: 'pointer'}}>

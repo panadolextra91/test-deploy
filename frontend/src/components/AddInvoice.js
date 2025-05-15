@@ -9,7 +9,9 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
     const [form] = Form.useForm();
     const [items, setItems] = useState([]);
     const [medicines, setMedicines] = useState([]);
+    const [products, setProducts] = useState([]);
     const [selectedMedicine, setSelectedMedicine] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
     const [itemQuantity, setItemQuantity] = useState(1);
     const [customerPhone, setCustomerPhone] = useState('');
     const [loadingCustomer, setLoadingCustomer] = useState(false);
@@ -20,10 +22,15 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
     useEffect(() => {
         if (visible) {
             const initialize = async () => {
-                await fetchMedicines();
+                if (invoiceType === 'sale') {
+                    await fetchMedicines();
+                } else {
+                    await fetchProducts();
+                }
                 form.resetFields();
                 setItems([]);
                 setSelectedMedicine(null);
+                setSelectedProduct(null);
                 setItemQuantity(1);
                 setCustomerPhone('');
                 setInvoiceType('sale');
@@ -31,6 +38,19 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
             initialize();
         }
     }, [visible]);
+
+    useEffect(() => {
+        if (visible) {
+            if (invoiceType === 'sale') {
+                fetchMedicines();
+            } else {
+                fetchProducts();
+            }
+            setSelectedMedicine(null);
+            setSelectedProduct(null);
+            setItemQuantity(1);
+        }
+    }, [invoiceType, visible]);
 
     const fetchMedicines = async () => {
         try {
@@ -46,6 +66,23 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
         } catch (error) {
             console.error("Error fetching medicines:", error);
             message.error("Failed to fetch medicines data.");
+        }
+    };
+
+    const fetchProducts = async () => {
+        try {
+            const token = sessionStorage.getItem('token');
+            if (!token) {
+                message.error("Authentication token is missing.");
+                return;
+            }
+            const response = await axios.get(`${backendUrl}/api/products`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setProducts(response.data);
+        } catch (error) {
+            console.error("Error fetching products:", error);
+            message.error("Failed to fetch products data.");
         }
     };
 
@@ -99,71 +136,111 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
     };
 
     const handleAddItem = () => {
-        if (!selectedMedicine) {
-            message.error("Please select a medicine.");
-            return;
-        }
-
-        const medicine = medicines.find(med => med.id === selectedMedicine.id);
-        if (!medicine) {
-            message.error("Selected medicine not found.");
-            return;
-        }
-
-        const price = Number(medicine.price);
-        const availableQuantity = Number(medicine.quantity);
-
-        if (isNaN(price) || isNaN(availableQuantity)) {
-            message.error("Invalid data for the selected medicine.");
-            return;
-        }
-
-        if (itemQuantity < 1) {
-            message.error("Quantity must be at least 1.");
-            return;
-        }
-
-        let maxAllowedQuantity = availableQuantity;
         if (invoiceType === 'sale') {
-            maxAllowedQuantity = availableQuantity;
-        } else if (invoiceType === 'purchase') {
-            maxAllowedQuantity = availableQuantity + 1000;
-        }
-
-        if (itemQuantity > maxAllowedQuantity) {
-            message.error(`Selected quantity exceeds allowed stock (${maxAllowedQuantity}).`);
-            return;
-        }
-
-        const existingItemIndex = items.findIndex((item) => item.medicine_id === selectedMedicine.id);
-        if (existingItemIndex >= 0) {
-            const existingItem = items[existingItemIndex];
-            const newQuantity = existingItem.quantity + itemQuantity;
-
-            if (newQuantity > maxAllowedQuantity) {
-                message.error(`Total quantity for "${selectedMedicine.name}" exceeds allowed stock (${maxAllowedQuantity}).`);
+            if (!selectedMedicine) {
+                message.error("Please select a medicine.");
                 return;
             }
-
-            const updatedItems = [...items];
-            updatedItems[existingItemIndex].quantity = newQuantity;
-            updatedItems[existingItemIndex].total = newQuantity * existingItem.price;
-            setItems(updatedItems);
-        } else {
-            const newItem = {
-                key: items.length + 1,
-                medicine_id: selectedMedicine.id,
-                name: selectedMedicine.name,
-                quantity: itemQuantity,
-                price: price,
-                total: itemQuantity * price,
-                available_quantity: maxAllowedQuantity,
-            };
-            setItems([...items, newItem]);
+            const medicine = medicines.find(med => med.id === selectedMedicine.id);
+            if (!medicine) {
+                message.error("Selected medicine not found.");
+                return;
+            }
+            const price = Number(medicine.price);
+            const availableQuantity = Number(medicine.quantity);
+            if (isNaN(price) || isNaN(availableQuantity)) {
+                message.error("Invalid data for the selected medicine.");
+                return;
+            }
+            if (itemQuantity < 1) {
+                message.error("Quantity must be at least 1.");
+                return;
+            }
+            let maxAllowedQuantity = availableQuantity;
+            if (itemQuantity > maxAllowedQuantity) {
+                message.error(`Selected quantity exceeds allowed stock (${maxAllowedQuantity}).`);
+                return;
+            }
+            const existingItemIndex = items.findIndex((item) => item.medicine_id === selectedMedicine.id);
+            if (existingItemIndex >= 0) {
+                const existingItem = items[existingItemIndex];
+                const newQuantity = existingItem.quantity + itemQuantity;
+                if (newQuantity > maxAllowedQuantity) {
+                    message.error(`Total quantity for "${selectedMedicine.name}" exceeds allowed stock (${maxAllowedQuantity}).`);
+                    return;
+                }
+                const updatedItems = [...items];
+                updatedItems[existingItemIndex].quantity = newQuantity;
+                updatedItems[existingItemIndex].total = newQuantity * existingItem.price;
+                setItems(updatedItems);
+            } else {
+                const newItem = {
+                    key: items.length + 1,
+                    medicine_id: selectedMedicine.id,
+                    name: selectedMedicine.name,
+                    quantity: itemQuantity,
+                    price: price,
+                    total: itemQuantity * price,
+                    available_quantity: maxAllowedQuantity,
+                };
+                setItems([...items, newItem]);
+            }
+            setSelectedMedicine(null);
+            setItemQuantity(1);
+        } else if (invoiceType === 'purchase') {
+            if (!selectedProduct) {
+                message.error("Please select a product.");
+                return;
+            }
+            const product = products.find(prod => prod.id === selectedProduct.id);
+            if (!product) {
+                message.error("Selected product not found.");
+                return;
+            }
+            const price = Number(product.price);
+            const availableQuantity = Number(product.quantity || 0);
+            if (isNaN(price)) {
+                message.error("Invalid price for the selected product.");
+                return;
+            }
+            if (itemQuantity < 1) {
+                message.error("Quantity must be at least 1.");
+                return;
+            }
+            let maxAllowedQuantity = availableQuantity + 1000;
+            if (itemQuantity > maxAllowedQuantity) {
+                message.error(`Selected quantity exceeds allowed stock (${maxAllowedQuantity}).`);
+                return;
+            }
+            const existingItemIndex = items.findIndex((item) => item.product_id === selectedProduct.id);
+            if (existingItemIndex >= 0) {
+                const existingItem = items[existingItemIndex];
+                const newQuantity = existingItem.quantity + itemQuantity;
+                if (newQuantity > maxAllowedQuantity) {
+                    message.error(`Total quantity for "${selectedProduct.name}" exceeds allowed stock (${maxAllowedQuantity}).`);
+                    return;
+                }
+                const updatedItems = [...items];
+                updatedItems[existingItemIndex].quantity = newQuantity;
+                updatedItems[existingItemIndex].total = newQuantity * existingItem.price;
+                setItems(updatedItems);
+            } else {
+                const newItem = {
+                    key: items.length + 1,
+                    product_id: selectedProduct.id,
+                    name: product.name,
+                    brand: product.brand,
+                    supplier: product.Supplier ? product.Supplier.name : '',
+                    quantity: itemQuantity,
+                    price: price,
+                    total: itemQuantity * price,
+                    available_quantity: maxAllowedQuantity,
+                };
+                setItems([...items, newItem]);
+            }
+            setSelectedProduct(null);
+            setItemQuantity(1);
         }
-
-        setSelectedMedicine(null);
-        setItemQuantity(1);
     };
 
     const handleQuantityChange = (key, newQuantity) => {
@@ -206,7 +283,6 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
             let customerId = null;
 
             if (values.customer_phone) {
-                // Fetch or create customer logic
                 try {
                     const response = await axios.get(
                         `${backendUrl}/api/customers/phone/${values.customer_phone}`,
@@ -214,21 +290,6 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                     );
                     if (response.data) {
                         customerId = response.data.id;
-                    } else {
-                        // Optionally, create a new customer if not found
-                        /*
-                        const customerPayload = {
-                            name: values.customer_name || "Unknown",
-                            phone: values.customer_phone,
-                        };
-                        const customerResponse = await axios.post(
-                            "http://localhost:3000/api/customers",
-                            customerPayload,
-                            { headers: { Authorization: `Bearer ${token}` } }
-                        );
-                        customerId = customerResponse.data.id;
-                        */
-                        // For now, we'll leave it as null
                     }
                 } catch (error) {
                     console.error("Error fetching/creating customer:", error);
@@ -237,36 +298,47 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                 }
             }
 
-            const payload = {
-                invoice_date: new Date().toISOString(),
-                type: values.status,
-                customer_id: customerId,
-                items: items.map((item) => ({
+            let itemsPayload;
+            if (invoiceType === 'sale') {
+                itemsPayload = items.map((item) => ({
                     medicine_id: item.medicine_id,
                     quantity: item.quantity,
-                })),
+                    price: item.price,
+                }));
+            } else {
+                itemsPayload = items.map((item) => ({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    price: item.price,
+                }));
+            }
+
+            const payload = {
+                type: invoiceType,
+                customer_id: customerId,
+                invoice_date: new Date(),
+                items: itemsPayload,
             };
 
-            // Make POST request to create the invoice
-            const response = await axios.post(`${backendUrl}/api/invoices`, payload, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
+            const response = await axios.post(
+                `${backendUrl}/api/invoices`,
+                payload,
+                { headers: { Authorization: `Bearer ${token}` } }
+            );
 
             message.success("Invoice created successfully!");
-            // Call onCreate with the created invoice
             onCreate(response.data);
-            // Refetch medicines to update stock
-            await fetchMedicines();
+
+            if (invoiceType === 'sale') await fetchMedicines();
+            else await fetchProducts();
+
             handleCancel();
         } catch (error) {
             console.error("Error creating invoice or customer:", error.response?.data || error.message);
-            // Display the specific error message from the backend
             const errorMsg = error.response?.data?.error || "Failed to create invoice";
             message.error(errorMsg);
         }
     };
-
-
 
     const handleCancel = () => {
         form.resetFields();
@@ -280,10 +352,24 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
 
     const columns = [
         {
-            title: "Item Name",
+            title: invoiceType === 'sale' ? "Medicine Name" : "Product Name",
             dataIndex: "name",
             key: "name",
         },
+        ...(invoiceType === 'purchase'
+            ? [
+                {
+                    title: "Brand",
+                    dataIndex: "brand",
+                    key: "brand",
+                },
+                {
+                    title: "Supplier",
+                    dataIndex: "supplier",
+                    key: "supplier",
+                },
+            ]
+            : []),
         {
             title: "Quantity",
             dataIndex: "quantity",
@@ -355,42 +441,81 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                 </Form.Item>
 
                 <div style={{ marginBottom: 16 }}>
-                    <Select
-                        placeholder="Select a medicine"
-                        value={selectedMedicine?.id || null}
-                        onChange={(value) => {
-                            const medicine = medicines.find((m) => m.id === value);
-                            setSelectedMedicine(medicine);
-                        }}
-                        style={{ width: '40%', marginRight: 8 }}
-                        showSearch
-                        optionFilterProp="children"
-                        filterOption={(input, option) =>
-                            option.children.toLowerCase().includes(input.toLowerCase())
-                        }
-                    >
-                        {medicines.map((medicine) => (
-                            <Option
-                                key={medicine.id}
-                                value={medicine.id}
-                                disabled={invoiceType === 'sale' && medicine.quantity === 0}
+                    {invoiceType === 'sale' ? (
+                        <>
+                            <Select
+                                placeholder="Select a medicine"
+                                value={selectedMedicine?.id || null}
+                                onChange={(value) => {
+                                    const medicine = medicines.find((m) => m.id === value);
+                                    setSelectedMedicine(medicine);
+                                }}
+                                style={{ width: '40%', marginRight: 8 }}
+                                showSearch
+                                optionFilterProp="children"
+                                filterOption={(input, option) =>
+                                    option.children.toLowerCase().includes(input.toLowerCase())
+                                }
                             >
-                                {medicine.name} {medicine.quantity > 0 ? `(${medicine.quantity} available)` : "(Out of stock)"}
-                            </Option>
-                        ))}
-                    </Select>
-                    <InputNumber
-                        min={1}
-                        max={selectedMedicine ? (invoiceType === 'sale' ? selectedMedicine.quantity : selectedMedicine.quantity + 1000) : 1}
-                        placeholder="Quantity"
-                        value={itemQuantity}
-                        onChange={(value) => setItemQuantity(value)}
-                        style={{ width: '20%', marginRight: 8 }}
-                        disabled={!selectedMedicine}
-                    />
-                    <Button type="primary" onClick={handleAddItem} disabled={!selectedMedicine}>
-                        Add Item
-                    </Button>
+                                {medicines.map((medicine) => (
+                                    <Option
+                                        key={medicine.id}
+                                        value={medicine.id}
+                                        disabled={medicine.quantity === 0}
+                                    >
+                                        {medicine.name} {medicine.quantity > 0 ? `(${medicine.quantity} available)` : "(Out of stock)"}
+                                    </Option>
+                                ))}
+                            </Select>
+                            <InputNumber
+                                min={1}
+                                max={selectedMedicine ? selectedMedicine.quantity : 1}
+                                placeholder="Quantity"
+                                value={itemQuantity}
+                                onChange={(value) => setItemQuantity(value)}
+                                style={{ width: '20%', marginRight: 8 }}
+                                disabled={!selectedMedicine}
+                            />
+                            <Button type="primary" onClick={handleAddItem} disabled={!selectedMedicine}>
+                                Add Item
+                            </Button>
+                        </>
+                    ) : (
+                        <>
+                            <Select
+                                placeholder="Select a product"
+                                value={selectedProduct?.id || null}
+                                onChange={(value) => {
+                                    const product = products.find((p) => p.id === value);
+                                    setSelectedProduct(product);
+                                }}
+                                style={{ width: '40%', marginRight: 8 }}
+                                showSearch
+                                optionFilterProp="children"
+                                filterOption={(input, option) =>
+                                    option.children.toLowerCase().includes(input.toLowerCase())
+                                }
+                            >
+                                {products.map((product) => (
+                                    <Option key={product.id} value={product.id}>
+                                        {product.name} | Brand: {product.brand} | Supplier: {product.Supplier ? product.Supplier.name : ''} | Price: ${product.price}
+                                    </Option>
+                                ))}
+                            </Select>
+                            <InputNumber
+                                min={1}
+                                max={selectedProduct ? (selectedProduct.quantity || 0) + 1000 : 1}
+                                placeholder="Quantity"
+                                value={itemQuantity}
+                                onChange={(value) => setItemQuantity(value)}
+                                style={{ width: '20%', marginRight: 8 }}
+                                disabled={!selectedProduct}
+                            />
+                            <Button type="primary" onClick={handleAddItem} disabled={!selectedProduct}>
+                                Add Item
+                            </Button>
+                        </>
+                    )}
                 </div>
 
                 <Table columns={columns} dataSource={items} pagination={false} rowKey="key" />

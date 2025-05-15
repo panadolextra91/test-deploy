@@ -26,6 +26,18 @@ InvoiceItem.belongsTo(Medicine, {
     onDelete: 'CASCADE'
 });
 
+// Association for purchase invoices
+InvoiceItem.belongsTo(Product, {
+    foreignKey: 'product_id',
+    as: 'product',
+    onDelete: 'CASCADE'
+});
+Product.hasMany(InvoiceItem, {
+    foreignKey: 'product_id',
+    as: 'invoiceItems',
+    onDelete: 'CASCADE'
+});
+
 Invoice.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
 Customer.hasMany(Invoice, { foreignKey: 'customer_id' });
 

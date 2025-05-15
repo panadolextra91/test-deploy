@@ -9,7 +9,9 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
     const [form] = Form.useForm();
     const [items, setItems] = useState([]);
     const [medicines, setMedicines] = useState([]);
+    const [products, setProducts] = useState([]);
     const [selectedMedicine, setSelectedMedicine] = useState(null);
+    const [selectedProduct, setSelectedProduct] = useState(null);
     const [itemQuantity, setItemQuantity] = useState(1);
     const [customerPhone, setCustomerPhone] = useState('');
     const [loadingCustomer, setLoadingCustomer] = useState(false);
@@ -19,7 +21,8 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         if (visible) {
             const initialize = async () => {
                 const fetchedMedicines = await fetchMedicines();
-                populateForm(fetchedMedicines);
+                const fetchedProducts = await fetchProducts();
+                populateForm(fetchedMedicines, fetchedProducts);
             };
             initialize();
         }
@@ -39,8 +42,22 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         }
     };
 
-    const populateForm = (fetchedMedicines) => {
-        if (invoice && fetchedMedicines.length > 0) {
+    const fetchProducts = async () => {
+        try {
+            const token = sessionStorage.getItem('token');
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/products`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            setProducts(response.data);
+            return response.data;
+        } catch (error) {
+            message.error("Failed to fetch products data.");
+            return [];
+        }
+    };
+
+    const populateForm = (fetchedMedicines, fetchedProducts) => {
+        if (invoice && (fetchedMedicines.length > 0 || fetchedProducts.length > 0)) {
             form.setFieldsValue({
                 customer_phone: invoice.customerPhone !== "N/A" ? invoice.customerPhone : '',
                 customer_name: invoice.customerName !== "N/A" ? invoice.customerName : '',
@@ -50,24 +67,38 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
             setInvoiceType(invoice.type);
 
             const preparedItems = invoice.items.map((item) => {
-                const medicine = fetchedMedicines.find(med => med.id === item.medicine_id);
-                const availableQuantity = invoice.type === 'sale'
-                    ? medicine.quantity + item.quantity
-                    : medicine.quantity + 1000;
-
-                const price = parseFloat(medicine.price) || 0;
-
-                return {
-                    key: item.medicine_id,
-                    medicine_id: item.medicine_id,
-                    name: medicine.name,
-                    quantity: item.quantity,
-                    price: price,
-                    total: parseFloat((item.quantity * price).toFixed(2)),
-                    available_quantity: availableQuantity,
-                    toDelete: false,
-                };
-            });
+                if (invoice.type === 'sale') {
+                    const medicine = fetchedMedicines.find(med => med.id === item.medicine_id);
+                    if (!medicine) return null;
+                    const availableQuantity = medicine.quantity + item.quantity;
+                    const price = parseFloat(medicine.price) || 0;
+                    return {
+                        key: item.medicine_id,
+                        medicine_id: item.medicine_id,
+                        name: medicine.name,
+                        quantity: item.quantity,
+                        price: price,
+                        total: parseFloat((item.quantity * price).toFixed(2)),
+                        available_quantity: availableQuantity,
+                        toDelete: false,
+                    };
+                } else {
+                    const product = fetchedProducts.find(prod => prod.id === item.product_id);
+                    if (!product) return null;
+                    const availableQuantity = product.quantity + item.quantity;
+                    const price = parseFloat(product.price) || 0;
+                    return {
+                        key: item.product_id,
+                        product_id: item.product_id,
+                        name: product.name,
+                        quantity: item.quantity,
+                        price: price,
+                        total: parseFloat((item.quantity * price).toFixed(2)),
+                        available_quantity: availableQuantity,
+                        toDelete: false,
+                    };
+                }
+            }).filter(Boolean);
 
             setItems(preparedItems);
         }
@@ -80,50 +111,73 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
 
     const handleTypeChange = (type) => {
         setInvoiceType(type);
-        setItems(items.map(item => ({
-            ...item,
-            available_quantity: type === 'sale'
-                ? medicines.find(med => med.id === item.medicine_id)?.quantity + item.quantity || 0
-                : 1000,
-        })));
+        setSelectedMedicine(null);
+        setSelectedProduct(null);
+        setItems([]);
     };
 
     const handleAddItem = () => {
-        if (!selectedMedicine || itemQuantity < 1) {
-            message.error("Please select a valid medicine and quantity.");
-            return;
-        }
-
-        const existingItem = items.find(item => item.medicine_id === selectedMedicine.id);
-        const availableQuantity = invoiceType === 'sale'
-            ? selectedMedicine.quantity + (existingItem?.quantity || 0)
-            : 1000;
-
-        if (itemQuantity > availableQuantity) {
-            message.error(`Quantity exceeds available stock (${availableQuantity}).`);
-            return;
-        }
-
-        if (existingItem) {
-            setItems(items.map(item =>
-                item.medicine_id === selectedMedicine.id
-                    ? { ...item, quantity: item.quantity + itemQuantity, total: (item.quantity + itemQuantity) * item.price }
-                    : item
-            ));
+        if (invoiceType === 'sale') {
+            if (!selectedMedicine || itemQuantity < 1) {
+                message.error("Please select a valid medicine and quantity.");
+                return;
+            }
+            const existingItem = items.find(item => item.medicine_id === selectedMedicine.id);
+            const availableQuantity = selectedMedicine.quantity + (existingItem?.quantity || 0);
+            if (itemQuantity > availableQuantity) {
+                message.error(`Quantity exceeds available stock (${availableQuantity}).`);
+                return;
+            }
+            if (existingItem) {
+                setItems(items.map(item =>
+                    item.medicine_id === selectedMedicine.id
+                        ? { ...item, quantity: item.quantity + itemQuantity, total: (item.quantity + itemQuantity) * item.price }
+                        : item
+                ));
+            } else {
+                setItems([...items, {
+                    key: selectedMedicine.id,
+                    medicine_id: selectedMedicine.id,
+                    name: selectedMedicine.name,
+                    quantity: itemQuantity,
+                    price: selectedMedicine.price,
+                    total: itemQuantity * selectedMedicine.price,
+                    available_quantity: availableQuantity,
+                    toDelete: false,
+                }]);
+            }
+            setSelectedMedicine(null);
         } else {
-            setItems([...items, {
-                key: selectedMedicine.id,
-                medicine_id: selectedMedicine.id,
-                name: selectedMedicine.name,
-                quantity: itemQuantity,
-                price: selectedMedicine.price,
-                total: itemQuantity * selectedMedicine.price,
-                available_quantity: availableQuantity,
-                toDelete: false,
-            }]);
+            if (!selectedProduct || itemQuantity < 1) {
+                message.error("Please select a valid product and quantity.");
+                return;
+            }
+            const existingItem = items.find(item => item.product_id === selectedProduct.id);
+            const availableQuantity = selectedProduct.quantity + (existingItem?.quantity || 0);
+            if (itemQuantity > availableQuantity) {
+                message.error(`Quantity exceeds available stock (${availableQuantity}).`);
+                return;
+            }
+            if (existingItem) {
+                setItems(items.map(item =>
+                    item.product_id === selectedProduct.id
+                        ? { ...item, quantity: item.quantity + itemQuantity, total: (item.quantity + itemQuantity) * item.price }
+                        : item
+                ));
+            } else {
+                setItems([...items, {
+                    key: selectedProduct.id,
+                    product_id: selectedProduct.id,
+                    name: selectedProduct.name,
+                    quantity: itemQuantity,
+                    price: selectedProduct.price,
+                    total: itemQuantity * selectedProduct.price,
+                    available_quantity: availableQuantity,
+                    toDelete: false,
+                }]);
+            }
+            setSelectedProduct(null);
         }
-
-        setSelectedMedicine(null);
         setItemQuantity(1);
     };
 
@@ -131,7 +185,6 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         if (quantity < 0) {
             return;
         }
-
         setItems(items.map(item =>
             item.key === key
                 ? { ...item, quantity, total: quantity * item.price }
@@ -143,22 +196,29 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         try {
             const values = await form.validateFields();
             const token = sessionStorage.getItem("token");
-
+            let itemsPayload = [];
+            if (invoiceType === 'sale') {
+                itemsPayload = items.map(item => ({
+                    medicine_id: item.medicine_id,
+                    quantity: item.quantity,
+                    toDelete: item.toDelete,
+                }));
+            } else {
+                itemsPayload = items.map(item => ({
+                    product_id: item.product_id,
+                    quantity: item.quantity,
+                    toDelete: item.toDelete,
+                }));
+            }
             const payload = {
                 invoice_date: new Date().toISOString(),
                 type: values.status,
                 customer_id: customerPhone,
-                items: items.map(item => ({
-                    medicine_id: item.medicine_id,
-                    quantity: item.quantity,
-                    toDelete: item.toDelete,
-                })),
+                items: itemsPayload,
             };
-
             const response = await axios.put(`${process.env.REACT_APP_BACKEND_URL}/api/invoices/${invoice.id}`, payload, {
                 headers: { Authorization: `Bearer ${token}` },
             });
-
             message.success("Invoice updated successfully!");
             onEdit(response.data);
             handleCancel();
@@ -199,11 +259,11 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         [form]
     );
 
-
     const handleCancel = () => {
         form.resetFields();
         setItems([]);
         setSelectedMedicine(null);
+        setSelectedProduct(null);
         setItemQuantity(1);
         setCustomerPhone('');
         setInvoiceType('sale');
@@ -278,15 +338,27 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
                 </Form.Item>
 
                 <div>
-                    <Select
-                        placeholder="Select a medicine"
-                        value={selectedMedicine?.id || null}
-                        onChange={(value) => setSelectedMedicine(medicines.find(m => m.id === value))}
-                    >
-                        {medicines.map(med => (
-                            <Option key={med.id} value={med.id}>{med.name}</Option>
-                        ))}
-                    </Select>
+                    {invoiceType === 'sale' ? (
+                        <Select
+                            placeholder="Select a medicine"
+                            value={selectedMedicine?.id || null}
+                            onChange={(value) => setSelectedMedicine(medicines.find(m => m.id === value))}
+                        >
+                            {medicines.map(med => (
+                                <Option key={med.id} value={med.id}>{med.name}</Option>
+                            ))}
+                        </Select>
+                    ) : (
+                        <Select
+                            placeholder="Select a product"
+                            value={selectedProduct?.id || null}
+                            onChange={(value) => setSelectedProduct(products.find(p => p.id === value))}
+                        >
+                            {products.map(prod => (
+                                <Option key={prod.id} value={prod.id}>{prod.name}</Option>
+                            ))}
+                        </Select>
+                    )}
                     <InputNumber
                         min={1}
                         value={itemQuantity}
