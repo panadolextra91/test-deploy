@@ -8,6 +8,16 @@ const User = sequelize.define('User', {
         primaryKey: true,
         autoIncrement: true,
     },
+    pharmacy_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,                    // users must belong to a pharmacy
+        references: {
+            model: 'pharmacies',
+            key: 'id'
+        },
+        onDelete: 'CASCADE',
+        onUpdate: 'CASCADE'
+    },
     username: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -47,7 +57,7 @@ const User = sequelize.define('User', {
     avatarUrl: {
         type: DataTypes.VIRTUAL,
         get() {
-            return this.avatar; // Now returns the full Cloudinary URL
+            return this.avatar;
         }
     },
     created_at: {
@@ -57,15 +67,15 @@ const User = sequelize.define('User', {
     },
 }, {
     tableName: 'users',
-    timestamps: false, // Disable automatic timestamps like createdAt and updatedAt
+    timestamps: false,
     indexes: [
         {
-            unique: true, // Unique index on username
+            unique: true,
             fields: ['username'],
             name: 'users_username_unique'
         },
         {
-            unique: true, // Unique index on email
+            unique: true,
             fields: ['email'],
             name: 'users_email_unique'
         }

@@ -20,6 +20,7 @@ const invoiceRoutes = require('./routes/invoiceRoutes');
 const invoiceItemRoutes = require('./routes/invoiceItemRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const customerRoutes = require('./routes/customerRoutes');
+const productRoutes = require('./routes/productRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -77,6 +78,7 @@ app.use('/api/invoices', invoiceRoutes);
 app.use('/api/invoice-items', invoiceItemRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/customers', customerRoutes);
+app.use('/api/products', productRoutes);
 
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
