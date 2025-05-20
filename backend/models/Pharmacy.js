@@ -6,7 +6,8 @@ const Pharmacy = sequelize.define('Pharmacy', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
-    autoIncrement: true
+    autoIncrement: true,
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,
@@ -15,10 +16,22 @@ const Pharmacy = sequelize.define('Pharmacy', {
   address: {
     type: DataTypes.TEXT,
     allowNull: false
+  },
+  contact_email: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      isEmail: true
+    }
   }
 }, {
   tableName: 'pharmacies',
-  timestamps: false
+  timestamps: true,
+  underscored: true,
+  paranoid: false,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at',
+  deletedAt: false
 });
 
 module.exports = Pharmacy;

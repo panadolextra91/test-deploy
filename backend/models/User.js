@@ -8,16 +8,6 @@ const User = sequelize.define('User', {
         primaryKey: true,
         autoIncrement: true,
     },
-    pharmacy_id: {
-        type: DataTypes.INTEGER,
-        allowNull: false,                    // users must belong to a pharmacy
-        references: {
-            model: 'pharmacies',
-            key: 'id'
-        },
-        onDelete: 'CASCADE',
-        onUpdate: 'CASCADE'
-    },
     username: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -52,7 +42,8 @@ const User = sequelize.define('User', {
     avatarPublicId: {
         type: DataTypes.STRING,
         allowNull: true,
-        defaultValue: null
+        defaultValue: null,
+        field: 'avatarPublicId'
     },
     avatarUrl: {
         type: DataTypes.VIRTUAL,
@@ -60,14 +51,30 @@ const User = sequelize.define('User', {
             return this.avatar;
         }
     },
+    pharmacy_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'pharmacies',
+            key: 'id'
+        }
+    },
     created_at: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: Sequelize.NOW,
     },
+    updated_at: {
+        type: DataTypes.DATE,
+        allowNull: false,
+        defaultValue: Sequelize.NOW,
+    }
 }, {
     tableName: 'users',
-    timestamps: false,
+    timestamps: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at',
+    underscored: true,
     indexes: [
         {
             unique: true,

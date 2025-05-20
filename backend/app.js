@@ -21,6 +21,7 @@ const invoiceItemRoutes = require('./routes/invoiceItemRoutes');
 const locationRoutes = require('./routes/locationRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const productRoutes = require('./routes/productRoutes');
+const otpRoutes = require('./routes/otpRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -31,7 +32,8 @@ console.log('Binding to port:', PORT);
 const allowedOrigins = [
   'https://medimaster-fe.vercel.app',  // Production frontend
   'http://localhost:3001',             // Development frontend
-  'http://localhost:3000'
+  'http://localhost:3000',
+  'http://localhost:8081' // Development app
 ];
 console.log('Current environment:', process.env.NODE_ENV);
 console.log('Allowed CORS origins:', allowedOrigins);
@@ -79,6 +81,7 @@ app.use('/api/invoice-items', invoiceItemRoutes);
 app.use('/api/locations', locationRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/products', productRoutes);
+app.use('/api/otps', otpRoutes);
 
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

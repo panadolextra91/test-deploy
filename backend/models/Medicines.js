@@ -1,6 +1,6 @@
-const { DataTypes } = require('sequelize');
+const { DataTypes, Model } = require('sequelize');
 const sequelize = require('../config/database');
-const Location = require('./Location'); // Import Location model
+const Location = require('./Location');
 
 const Medicine = sequelize.define('Medicine', {
     id: {
@@ -61,7 +61,7 @@ const Medicine = sequelize.define('Medicine', {
     timestamps: false,
 });
 
-// Define the association
+// Define the associations
 Medicine.belongsTo(Location, { foreignKey: 'location_id' });
 
 module.exports = Medicine;

@@ -450,4 +450,3 @@ exports.deleteAvatar = async (req, res) => {
         });
     }
 };
-

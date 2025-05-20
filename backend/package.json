@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "PORT=3000 node app.js",
-    "dev": "nodemon app.js",
+    "dev": "PORT=3000 nodemon --watch . --ext js,json app.js",
     "migrate": "sequelize-cli db:migrate",
     "migrate:undo": "sequelize-cli db:migrate:undo",
     "test": "echo \"Error: no test specified\" && exit 1"
@@ -27,10 +27,11 @@
     "multer": "^1.4.5-lts.1",
     "mysql2": "^3.14.0",
     "nodemailer": "^6.9.16",
-    "sequelize": "^6.37.3"
+    "sequelize": "^6.37.3",
+    "twilio": "^5.6.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.0",
+    "nodemon": "^3.1.10",
     "sequelize-cli": "^6.6.3"
   }
 }

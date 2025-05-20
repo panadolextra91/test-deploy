@@ -6,6 +6,7 @@ const Product = require('./Product');
 const Supplier = require('./Supplier');
 const Pharmacy = require('./Pharmacy');
 const User = require('./User');
+const OTP = require('./OTP');
 //index.js
 // Define associations here after all models are loaded
 Invoice.hasMany(InvoiceItem, {
@@ -41,23 +42,33 @@ Product.hasMany(InvoiceItem, {
 Invoice.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
 Customer.hasMany(Invoice, { foreignKey: 'customer_id' });
 
-
 // Supplier ↔ Product
 Supplier.hasMany(Product, { foreignKey: 'supplier_id', as: 'products', onDelete: 'CASCADE' });
 Product.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
 
-// A user belongs to one pharmacy:
+// User ↔ Pharmacy (only this relationship remains)
 User.belongsTo(Pharmacy, {
     foreignKey: 'pharmacy_id',
-    as: 'Pharmacy'
-  });
-  
-  // A pharmacy has many users:
-  Pharmacy.hasMany(User, {
-    foreignKey: 'pharmacy_id',
-    as: 'Users'
-  });
+    as: 'pharmacy'
+});
 
+Pharmacy.hasMany(User, {
+    foreignKey: 'pharmacy_id',
+    as: 'users'
+});
+
+// OTP ↔ Customer
+OTP.belongsTo(Customer, { 
+    foreignKey: 'phone',
+    targetKey: 'phone',
+    as: 'customer'
+});
+
+Customer.hasMany(OTP, {
+    foreignKey: 'phone',
+    sourceKey: 'phone',
+    as: 'otps'
+});
 
 module.exports = {
     Invoice,
@@ -68,4 +79,5 @@ module.exports = {
     Supplier,
     Pharmacy,
     User,
+    OTP
 };

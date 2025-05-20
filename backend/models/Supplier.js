@@ -18,7 +18,7 @@ const Supplier = sequelize.define('Supplier', {
     address: {
         type: DataTypes.TEXT,
         allowNull: true,
-    },
+    }
 }, {
     tableName: 'suppliers',
     timestamps: false, // Disable timestamps
