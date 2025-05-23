@@ -22,6 +22,11 @@ const locationRoutes = require('./routes/locationRoutes');
 const customerRoutes = require('./routes/customerRoutes');
 const productRoutes = require('./routes/productRoutes');
 const otpRoutes = require('./routes/otpRoutes');
+const orderRoutes = require('./routes/orderRoutes');
+const orderItemRoutes = require('./routes/orderItemRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
+const pharmaSalesRepRoutes = require('./routes/pharmaSalesRepRoutes');
+const brandRoutes = require('./routes/brandRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -82,7 +87,11 @@ app.use('/api/locations', locationRoutes);
 app.use('/api/customers', customerRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/otps', otpRoutes);
-
+app.use('/api/orders', orderRoutes);
+app.use('/api/order-items', orderItemRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/pharma-sales-reps', pharmaSalesRepRoutes);
+app.use('/api/brands', brandRoutes);
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 //app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));

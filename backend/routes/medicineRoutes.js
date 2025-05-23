@@ -14,7 +14,7 @@ router.get('/:id', medicineController.getMedicineById);
 router.get('/name/:name', medicineController.getMedicineByName)
 
 router.post('/', authenticateToken, authorize('admin', 'pharmacist'), medicineUpload.single('image'), medicineController.createMedicine);
-router.put('/:id', authenticateToken, authorize('admin', 'pharmacist'), medicineController.updateMedicine);
+router.put('/:id', authenticateToken, authorize('admin', 'pharmacist'), medicineUpload.single('image'), medicineController.updateMedicine);
 router.delete('/:id', authenticateToken, authorize('admin', 'pharmacist'), medicineController.deleteMedicine);
 
 // Medicine image routes

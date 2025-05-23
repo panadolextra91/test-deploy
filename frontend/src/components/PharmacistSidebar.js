@@ -9,7 +9,7 @@ import {
     LoginOutlined,
     DownOutlined,
 } from '@ant-design/icons';
-import logo from '../imgs/trace.svg'; // Replace with the correct path to your logo file
+import logo from '../imgs/MediMaster.png'; // Replace with the correct path to your logo file
 import './PharmacistSidebar.css';
 import {useNavigate} from "react-router-dom"; // Optional: Import CSS for styling if needed
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
@@ -33,11 +33,6 @@ const PharmacistSidebar = () => {
         <aside className="sidebar">
             <div className="border">
                 <img src={logo} alt="MediMaster" className="logo-image" />
-                <h2>
-                    Medi
-                    <br />
-                    Master
-                </h2>
             </div>
             <nav>
                 <ul>

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from 'react-router-dom';
 import './Login.css';
-import logo from '../imgs/trace.svg';
+import logo from '../imgs/MediMaster.png';
 import { Input, message } from "antd";
 import { LockOutlined, UserOutlined } from "@ant-design/icons";
 import axios from "axios";
@@ -71,7 +71,6 @@ const Login = () => {
         <div className='login-container'>
             <div className='login-form'>
                 <img src={logo} className='logo' alt="MediMaster Logo"/>
-                <h1>MediMaster</h1>
                 <p>Sign in to access your dashboard.</p>
                 <form onSubmit={handleLogin}>
                     <div className="input-group">
@@ -101,6 +100,9 @@ const Login = () => {
                     </div>
 
                     <button type="submit" className="login-button">Sign In</button>
+                    <a href="/import-product-list" className="sale-products-link">
+                        Want to introduce your company's products? Click here!
+                    </a>
                 </form>
             </div>
         </div>

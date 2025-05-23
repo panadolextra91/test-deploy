@@ -7,9 +7,9 @@
     border-right: #e5e7eb 1px solid;
 }
 .sidebar .border {
-    height: 100px;
+    height: 120px;
     display: flex;
-    border-bottom: #f5f5f5 2px solid;
+    border-bottom: #e5e7eb 2px solid;
     width: 240px;
     align-items: center;
 }
@@ -27,7 +27,7 @@
     font-weight: bolder;
 }
 .logo-image {
-    width: 100px;
+    width: 120px;
     height: 90px;
 
 }

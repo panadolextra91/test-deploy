@@ -4,6 +4,7 @@ const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/authorizeMiddleware');
 const router = express.Router();
 //supplierRoutes.js
+
 // Define routes
 router.get('/', authenticateToken, authorize('admin', 'pharmacist'), supplierController.getAllSuppliers);
 router.get('/:id', authenticateToken, authorize('admin', 'pharmacist'), supplierController.getSupplierById);

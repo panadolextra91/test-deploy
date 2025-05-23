@@ -7,6 +7,12 @@ const Supplier = require('./Supplier');
 const Pharmacy = require('./Pharmacy');
 const User = require('./User');
 const OTP = require('./OTP');
+const Notification = require('./Notification');
+const Order = require('./Order');
+const OrderItem = require('./OrderItem');
+const PharmaSalesRep = require('./PharmaSalesRep');
+const Brand = require('./Brand');
+
 //index.js
 // Define associations here after all models are loaded
 Invoice.hasMany(InvoiceItem, {
@@ -46,6 +52,10 @@ Customer.hasMany(Invoice, { foreignKey: 'customer_id' });
 Supplier.hasMany(Product, { foreignKey: 'supplier_id', as: 'products', onDelete: 'CASCADE' });
 Product.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
 
+// Brand ↔ Medicine
+Brand.hasMany(Medicine, { foreignKey: 'brand_id', as: 'medicines', onDelete: 'SET NULL' });
+Medicine.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brand' });
+
 // User ↔ Pharmacy (only this relationship remains)
 User.belongsTo(Pharmacy, {
     foreignKey: 'pharmacy_id',
@@ -70,6 +80,63 @@ Customer.hasMany(OTP, {
     as: 'otps'
 });
 
+// Order associations
+Order.belongsTo(Customer, { foreignKey: 'customer_id', as: 'customer' });
+Order.belongsTo(Pharmacy, { foreignKey: 'pharmacy_id', as: 'pharmacy' });
+Order.hasMany(OrderItem, { foreignKey: 'order_id', as: 'items' });
+
+// OrderItem associations
+OrderItem.belongsTo(Order, { foreignKey: 'order_id', as: 'order' });
+OrderItem.belongsTo(Medicine, { foreignKey: 'medicine_id', as: 'medicine' });
+
+// Notification associations
+Notification.belongsTo(User, {
+    foreignKey: 'recipient_id',
+    as: 'user',
+    constraints: false
+});
+
+Notification.belongsTo(Customer, {
+    foreignKey: 'recipient_id',
+    as: 'customer',
+    constraints: false
+});
+
+// Add scopes to User and Customer models
+User.hasMany(Notification, {
+    foreignKey: 'recipient_id',
+    as: 'notifications',
+    constraints: false
+});
+
+Customer.hasMany(Notification, {
+    foreignKey: 'recipient_id',
+    as: 'notifications',
+    constraints: false
+});
+
+// PharmaSalesRep associations
+PharmaSalesRep.belongsTo(Supplier, {
+    foreignKey: 'supplier_id',
+    as: 'supplier'
+});
+
+Supplier.hasMany(PharmaSalesRep, {
+    foreignKey: 'supplier_id',
+    as: 'salesReps'
+});
+
+// Product ↔ PharmaSalesRep
+Product.belongsTo(PharmaSalesRep, {
+    foreignKey: 'pharma_sales_rep_id',
+    as: 'salesRep'
+});
+
+PharmaSalesRep.hasMany(Product, {
+    foreignKey: 'pharma_sales_rep_id',
+    as: 'products'
+});
+
 module.exports = {
     Invoice,
     InvoiceItem,
@@ -79,5 +146,10 @@ module.exports = {
     Supplier,
     Pharmacy,
     User,
-    OTP
+    OTP,
+    Notification,
+    Order,
+    OrderItem,
+    PharmaSalesRep,
+    Brand
 };

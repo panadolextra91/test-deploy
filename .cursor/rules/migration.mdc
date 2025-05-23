@@ -1,0 +1,6 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+when i say "generate migration" or "create migration" or "make migration", always try to use command in directory /backend to make migration

@@ -5,6 +5,13 @@ const authenticate  = require('../middleware/authMiddleware');
 const authorize     = require('../middleware/authorizeMiddleware');
 const upload        = require('../middleware/multer')();  // for CSV import
 
+// External CSV import for pharma sales reps (no authentication required)
+router.post(
+  '/import-external',
+  upload.single('file'),
+  productController.importCsvExternal
+);
+
 // List all products (admin & pharmacist)
 router.get(
   '/',

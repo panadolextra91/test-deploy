@@ -36,6 +36,14 @@ const Medicine = sequelize.define('Medicine', {
         type: DataTypes.INTEGER,
         allowNull: false,
     },
+    brand_id: {
+        type: DataTypes.INTEGER,
+        allowNull: true,
+        references: {
+            model: 'brands',
+            key: 'id'
+        }
+    },
     image: {
         type: DataTypes.STRING,
         allowNull: true,

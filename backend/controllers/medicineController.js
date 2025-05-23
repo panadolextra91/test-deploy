@@ -1,4 +1,5 @@
 const Medicine = require('../models/Medicines');
+const { Brand } = require('../models');
 const sequelize = require('../config/database');
 const { QueryTypes, Op } = require('sequelize');
 const Location = require('../models/Location');
@@ -15,15 +16,44 @@ if (process.env.CLOUDINARY_URL) {
     console.error('CLOUDINARY_URL is not set in environment variables');
 }
 
-// Get all medicines
+// Get all medicines with optional brand filtering
 exports.getAllMedicines = async (req, res) => {
     try {
+        const { brand_id, search, category_id } = req.query;
+        
+        let whereClause = '';
+        const queryParams = [];
+
+        // Build WHERE clause for filtering
+        const conditions = [];
+        
+        if (brand_id) {
+            conditions.push('medicines.brand_id = ?');
+            queryParams.push(brand_id);
+        }
+        
+        if (search) {
+            conditions.push('medicines.name LIKE ?');
+            queryParams.push(`%${search}%`);
+        }
+        
+        if (category_id) {
+            conditions.push('medicines.category_id = ?');
+            queryParams.push(category_id);
+        }
+        
+        if (conditions.length > 0) {
+            whereClause = 'WHERE ' + conditions.join(' AND ');
+        }
+
         const query = `
             SELECT 
                 medicines.*,
                 suppliers.name AS supplier_name,
                 locations.name AS location_name,
-                categories.name AS category_name
+                categories.name AS category_name,
+                brands.name AS brand_name,
+                brands.manufacturer AS brand_manufacturer
             FROM 
                 medicines
             LEFT JOIN 
@@ -32,10 +62,15 @@ exports.getAllMedicines = async (req, res) => {
                 locations ON medicines.location_id = locations.id
             LEFT JOIN 
                 categories ON medicines.category_id = categories.id
+            LEFT JOIN 
+                brands ON medicines.brand_id = brands.id
+            ${whereClause}
+            ORDER BY medicines.name ASC
         `;
 
         const medicines = await sequelize.query(query, { 
             type: QueryTypes.SELECT,
+            replacements: queryParams,
             raw: true
         });
 
@@ -44,6 +79,8 @@ exports.getAllMedicines = async (req, res) => {
             supplier: medicine.supplier_name,
             location: medicine.location_name,
             category: medicine.category_name,
+            brand: medicine.brand_name,
+            brand_manufacturer: medicine.brand_manufacturer,
             imageUrl: medicine.image || null
         }));
 
@@ -89,11 +126,24 @@ exports.getMedicineByName = async (req, res) => {
 exports.createMedicine = async (req, res) => {
     const t = await sequelize.transaction();
     try {
+        console.log('📝 Creating medicine - Request body:', req.body);
+        console.log('📎 File received:', req.file ? 'Yes' : 'No');
+        if (req.file) {
+            console.log('📎 File details:', {
+                filename: req.file.filename,
+                originalname: req.file.originalname,
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                path: req.file.path
+            });
+        }
+
         const price = parseFloat(req.body.price);
         const quantity = parseInt(req.body.quantity, 10);
         const category_id = parseInt(req.body.category_id, 10);
         const supplier_id = parseInt(req.body.supplier_id, 10);
         const location_id = parseInt(req.body.location_id, 10);
+        const brand_id = req.body.brand_id ? parseInt(req.body.brand_id, 10) : null;
 
         if (!req.body.name || !category_id || !price || !quantity || !supplier_id || !location_id || !req.body.expiry_date) {
             return res.status(400).json({ error: 'Missing required fields' });
@@ -103,13 +153,17 @@ exports.createMedicine = async (req, res) => {
         let imageUrl = null;
         let imagePublicId = null;
         if (req.file) {
+            console.log('☁️ Uploading to Cloudinary...');
             const result = await cloudinary.uploader.upload(req.file.path, {
                 folder: 'medicines',
                 resource_type: 'auto'
             });
             imageUrl = result.secure_url;
             imagePublicId = result.public_id;
+            console.log('✅ Cloudinary upload successful:', imageUrl);
             await fs.unlink(req.file.path);
+        } else {
+            console.log('⚠️ No file to upload');
         }
 
         const newMedicine = await Medicine.create({
@@ -120,6 +174,7 @@ exports.createMedicine = async (req, res) => {
             quantity,
             supplier_id,
             location_id,
+            brand_id,
             image: imageUrl,
             imagePublicId,
             expiry_date: req.body.expiry_date
@@ -157,6 +212,7 @@ exports.updateMedicine = async (req, res) => {
             quantity: req.body.quantity,
             supplier_id: req.body.supplier_id,
             location_id: req.body.location_id,
+            brand_id: req.body.brand_id !== undefined ? req.body.brand_id : medicine.brand_id,
             expiry_date: req.body.expiry_date
         });
 

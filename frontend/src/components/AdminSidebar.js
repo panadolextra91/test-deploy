@@ -12,7 +12,7 @@ import {
 } from '@ant-design/icons';
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
-import logo from '../imgs/trace.svg'; // Replace with the correct path to your logo file
+import logo from '../imgs/MediMaster.png'; // Replace with the correct path to your logo file
 import './AdminSidebar.css';
 import {useNavigate} from "react-router-dom"; // Optional: Import CSS for styling if needed
 
@@ -33,11 +33,6 @@ const AdminSidebar = () => {
         <aside className="sidebar">
             <div className="border">
                 <img src={logo} alt="MediMaster" className="logo-image" />
-                <h2>
-                    Medi
-                    <br />
-                    Master
-                </h2>
             </div>
             <nav>
                 <ul>
