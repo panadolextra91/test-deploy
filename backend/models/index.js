@@ -12,6 +12,9 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const PharmaSalesRep = require('./PharmaSalesRep');
 const Brand = require('./Brand');
+const HealthMetrics = require('./HealthMetrics');
+const HealthRecord = require('./HealthRecord');
+const HealthMetricsHistory = require('./HealthMetricsHistory');
 
 //index.js
 // Define associations here after all models are loaded
@@ -137,6 +140,34 @@ PharmaSalesRep.hasMany(Product, {
     as: 'products'
 });
 
+// Health-related associations
+Customer.hasOne(HealthMetrics, {
+    foreignKey: 'customer_id',
+    as: 'healthMetrics'
+});
+HealthMetrics.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Customer.hasMany(HealthRecord, {
+    foreignKey: 'customer_id',
+    as: 'healthRecords'
+});
+HealthRecord.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Customer.hasMany(HealthMetricsHistory, {
+    foreignKey: 'customer_id',
+    as: 'healthMetricsHistory'
+});
+HealthMetricsHistory.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
 module.exports = {
     Invoice,
     InvoiceItem,
@@ -151,5 +182,8 @@ module.exports = {
     Order,
     OrderItem,
     PharmaSalesRep,
-    Brand
+    Brand,
+    HealthMetrics,
+    HealthRecord,
+    HealthMetricsHistory
 };
