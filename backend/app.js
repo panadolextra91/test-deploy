@@ -28,6 +28,9 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const pharmaSalesRepRoutes = require('./routes/pharmaSalesRepRoutes');
 const brandRoutes = require('./routes/brandRoutes');
 const authRoutes = require('./routes/authRoutes');
+const healthRecordRoutes = require('./routes/healthRecordRoutes');
+const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
+const allergyRoutes = require('./routes/allergyRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -94,6 +97,10 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/pharma-sales-reps', pharmaSalesRepRoutes);
 app.use('/api/brands', brandRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/health-records', healthRecordRoutes);
+app.use('/api/health-metrics', healthMetricsRoutes);
+app.use('/api/allergies', allergyRoutes);
+
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 //app.use('/uploads/avatars', express.static(path.join(__dirname, 'uploads/avatars')));

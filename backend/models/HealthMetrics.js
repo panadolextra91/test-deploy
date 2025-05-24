@@ -6,8 +6,8 @@ class HealthMetrics extends Model {}
 HealthMetrics.init({
   id: {
     type: DataTypes.INTEGER,
-    autoIncrement: true,
     primaryKey: true,
+    autoIncrement: true,
   },
   customer_id: {
     type: DataTypes.INTEGER,
@@ -17,28 +17,54 @@ HealthMetrics.init({
       key: 'id'
     }
   },
+  gender: {
+    type: DataTypes.ENUM('MALE', 'FEMALE'),
+    allowNull: false
+  },
+  date_of_birth: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
+  },
   blood_pressure_systolic: {
     type: DataTypes.INTEGER,
-    allowNull: true
+    allowNull: true,
+    validate: {
+      min: 0,
+      max: 300
+    }
   },
   blood_pressure_diastolic: {
     type: DataTypes.INTEGER,
+    allowNull: true,
+    validate: {
+      min: 0,
+      max: 200
+    }
+  },
+  blood_pressure: {
+    type: DataTypes.STRING,
     allowNull: true
   },
   weight: {
     type: DataTypes.DECIMAL(5, 2),
-    allowNull: true
+    allowNull: true,
+    validate: {
+      min: 0
+    }
   },
   height: {
     type: DataTypes.DECIMAL(5, 2),
-    allowNull: true
+    allowNull: true,
+    validate: {
+      min: 0
+    }
   },
   bmi: {
     type: DataTypes.DECIMAL(4, 2),
     allowNull: true
   },
   bmr: {
-    type: DataTypes.DECIMAL(7, 2),
+    type: DataTypes.INTEGER,
     allowNull: true
   },
   blood_type: {
@@ -49,8 +75,8 @@ HealthMetrics.init({
   sequelize,
   modelName: 'HealthMetrics',
   tableName: 'health_metrics',
-  underscored: true,
-  timestamps: true
+  timestamps: true,
+  underscored: true
 });
 
 module.exports = HealthMetrics; 
