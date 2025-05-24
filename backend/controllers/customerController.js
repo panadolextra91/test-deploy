@@ -1,4 +1,5 @@
 const Customer = require('../models/Customer');
+const bcrypt = require('bcrypt');
 
 exports.createCustomer = async (req, res) => {
     const { name, phone, email } = req.body;
@@ -80,5 +81,35 @@ exports.getAllCustomers = async (req, res) => {
     } catch (error) {
         console.error("Error retrieving all customers:", error);
         res.status(500).json({ error: "Failed to retrieve customers" });
+    }
+};
+
+exports.setPassword = async (req, res) => {
+    const { phone, password } = req.body;
+    
+    if (!phone || !password) {
+        return res.status(400).json({ error: 'Phone and password are required' });
+    }
+
+    try {
+        const customer = await Customer.findOne({ where: { phone } });
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        const hashedPassword = await bcrypt.hash(password, 10);
+        await customer.update({ 
+            password: hashedPassword,
+            verified: true  // Set verified to true when setting password
+        });
+
+        res.status(200).json({ 
+            success: true,
+            message: 'Password set successfully',
+            verified: true
+        });
+    } catch (error) {
+        console.error('Error setting password:', error);
+        res.status(500).json({ error: 'Failed to set password' });
     }
 };

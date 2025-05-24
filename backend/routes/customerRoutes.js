@@ -10,5 +10,6 @@ router.put('/:id', authenticateToken, authorize('admin', 'pharmacist'),  custome
 router.get('/:id', authenticateToken, authorize('admin', 'pharmacist'),  customerController.getCustomerById); // Get customer by ID
 router.get('/phone/:phone', authenticateToken, authorize('admin', 'pharmacist'),  customerController.getCustomerByPhone); // Get customer by phone
 router.get('/', authenticateToken, authorize('admin', 'pharmacist'), customerController.getAllCustomers); // Get all customers
+router.post('/set-password', customerController.setPassword); // Set customer password after OTP verification
 
 module.exports = router;

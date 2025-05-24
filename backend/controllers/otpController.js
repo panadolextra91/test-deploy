@@ -187,8 +187,11 @@ exports.verifyOTP = async (req, res) => {
         id: customer.id,
         name: customer.name,
         phone: customer.phone,
-        email: customer.email
-      }
+        email: customer.email,
+        hasPassword: !!customer.password,
+        verified: customer.verified
+      },
+      message: 'OTP verified successfully. You can now set your password.'
     });
   } catch (error) {
     console.error('Error in verifyOTP:', error);
