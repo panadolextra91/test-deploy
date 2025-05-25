@@ -6,6 +6,8 @@ const router = express.Router();
 const upload = require('../middleware/uploadMiddleware');
 //userRoutes.js
 // Define routes
+router.get('/pharmacies', userController.getPharmaciesForLogin); // Public route to get pharmacies for login
+router.get('/pharmacies/:username', userController.getPharmaciesForUsername); // Public route to get pharmacies for specific username
 router.get('/', authenticateToken, authorize('admin'), userController.getAllUsers); // Only admin can get all users
 router.post('/', authenticateToken, authorize('admin'), userController.createUser); // Only admin can create users
 router.post('/login', userController.loginUser); // Public route for login

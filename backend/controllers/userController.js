@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const { Pharmacy } = require('../models');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -6,6 +7,7 @@ const nodemailer = require('nodemailer');
 const fs = require('fs').promises;
 const path = require('path');
 const { v2: cloudinary } = require('cloudinary');
+const { Op } = require('sequelize');
 
 // Configure Cloudinary using the CLOUDINARY_URL from environment variables
 if (process.env.CLOUDINARY_URL) {
@@ -15,6 +17,59 @@ if (process.env.CLOUDINARY_URL) {
 } else {
   console.error('CLOUDINARY_URL is not set in environment variables');
 }
+
+// Get available pharmacies for login selection
+exports.getPharmaciesForLogin = async (req, res) => {
+    try {
+        const pharmacies = await Pharmacy.findAll({
+            attributes: ['id', 'name', 'address'],
+            order: [['name', 'ASC']]
+        });
+        
+        res.status(200).json({
+            success: true,
+            data: pharmacies
+        });
+    } catch (error) {
+        console.error('Error fetching pharmacies for login:', error);
+        res.status(500).json({ error: 'Failed to retrieve pharmacies' });
+    }
+};
+
+// Get pharmacies where a specific username exists (for login assistance)
+exports.getPharmaciesForUsername = async (req, res) => {
+    const { username } = req.params;
+    try {
+        if (!username) {
+            return res.status(400).json({ error: 'Username is required' });
+        }
+
+        const users = await User.findAll({
+            where: { username },
+            attributes: ['pharmacy_id'],
+            include: [{
+                model: Pharmacy,
+                as: 'pharmacy',
+                attributes: ['id', 'name', 'address']
+            }]
+        });
+
+        if (users.length === 0) {
+            return res.status(404).json({ error: 'Username not found in any pharmacy' });
+        }
+
+        const pharmacies = users.map(user => user.pharmacy);
+        
+        res.status(200).json({
+            success: true,
+            message: `Username '${username}' found in ${pharmacies.length} pharmacy(ies)`,
+            data: pharmacies
+        });
+    } catch (error) {
+        console.error('Error fetching pharmacies for username:', error);
+        res.status(500).json({ error: 'Failed to retrieve pharmacies for username' });
+    }
+};
 
 // Get all users (filtered by pharmacy for non-admin users)
 exports.getAllUsers = async (req, res) => {
@@ -59,6 +114,24 @@ exports.createUser = async (req, res) => {
             userPharmacyId = req.user.pharmacy_id;
         }
 
+        // Check for existing username/email within the same pharmacy
+        const existingUser = await User.findOne({
+            where: {
+                pharmacy_id: userPharmacyId,
+                [Op.or]: [
+                    { username: username },
+                    { email: email }
+                ]
+            }
+        });
+
+        if (existingUser) {
+            const conflictField = existingUser.username === username ? 'username' : 'email';
+            return res.status(400).json({ 
+                error: `${conflictField.charAt(0).toUpperCase() + conflictField.slice(1)} already exists in this pharmacy` 
+            });
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = await User.create({
@@ -91,19 +164,22 @@ exports.createUser = async (req, res) => {
 
 // User login
 exports.loginUser = async (req, res) => {
-    const { username, password } = req.body;
+    const { username, password, pharmacy_id } = req.body;
     try {
         // Log the login attempt
-        console.log('Login attempt for username:', username);
+        console.log('Login attempt for username:', username, 'pharmacy_id:', pharmacy_id);
 
-        // Check if username and password are provided
-        if (!username || !password) {
-            return res.status(400).json({ error: 'Username and password are required' });
+        // Check if username, password, and pharmacy_id are provided
+        if (!username || !password || !pharmacy_id) {
+            return res.status(400).json({ error: 'Username, password, and pharmacy_id are required' });
         }
 
-        // Find the user
+        // Find the user by username and pharmacy_id
         const user = await User.findOne({ 
-            where: { username },
+            where: { 
+                username: username,
+                pharmacy_id: pharmacy_id 
+            },
             raw: false // Ensure we get a model instance
         });
 
@@ -111,7 +187,7 @@ exports.loginUser = async (req, res) => {
         console.log('User found:', !!user);
 
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found in the specified pharmacy' });
         }
 
         // Compare passwords
@@ -342,6 +418,34 @@ exports.editUserById = async (req, res) => {
         const user = await User.findOne({ where: whereClause });
         if (!user) {
             return res.status(404).json({ error: 'User not found or access denied' });
+        }
+
+        // Determine target pharmacy_id for validation
+        let targetPharmacyId = user.pharmacy_id;
+        if (pharmacy_id && req.user.role === 'admin') {
+            targetPharmacyId = pharmacy_id;
+        }
+
+        // Check for conflicts within the target pharmacy (excluding current user)
+        if (username || email) {
+            const conflictConditions = [];
+            if (username) conflictConditions.push({ username: username });
+            if (email) conflictConditions.push({ email: email });
+
+            const existingUser = await User.findOne({
+                where: {
+                    pharmacy_id: targetPharmacyId,
+                    id: { [Op.ne]: id },
+                    [Op.or]: conflictConditions
+                }
+            });
+
+            if (existingUser) {
+                const conflictField = existingUser.username === username ? 'username' : 'email';
+                return res.status(400).json({ 
+                    error: `${conflictField.charAt(0).toUpperCase() + conflictField.slice(1)} already exists in this pharmacy` 
+                });
+            }
         }
 
         // Update fields

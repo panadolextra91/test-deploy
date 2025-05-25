@@ -76,13 +76,13 @@ const User = sequelize.define('User', {
     indexes: [
         {
             unique: true,
-            fields: ['username'],
-            name: 'users_username_unique'
+            fields: ['username', 'pharmacy_id'],
+            name: 'users_username_pharmacy_unique'
         },
         {
             unique: true,
-            fields: ['email'],
-            name: 'users_email_unique'
+            fields: ['email', 'pharmacy_id'],
+            name: 'users_email_pharmacy_unique'
         }
     ],
     hooks: {
