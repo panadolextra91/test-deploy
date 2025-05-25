@@ -17,7 +17,7 @@ router.post('/', orderController.createOrder);
 router.patch('/:id/status', authenticateToken, authorize('admin', 'pharmacist'), orderController.updateOrderStatus);
 
 // Delete order (requires admin authentication)
-router.delete('/:id', authenticateToken, authorize('admin'), orderController.deleteOrder);
+router.delete('/:id', authenticateToken, orderController.deleteOrder);
 
 module.exports = router;
 
