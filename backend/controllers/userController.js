@@ -16,21 +16,49 @@ if (process.env.CLOUDINARY_URL) {
   console.error('CLOUDINARY_URL is not set in environment variables');
 }
 
-// Get all users
+// Get all users (filtered by pharmacy for non-admin users)
 exports.getAllUsers = async (req, res) => {
     try {
-        const users = await User.findAll();
+        const whereClause = {};
+        
+        // Non-admin users can only see users from their own pharmacy
+        if (req.user.role !== 'admin') {
+            whereClause.pharmacy_id = req.user.pharmacy_id;
+        }
+
+        const users = await User.findAll({
+            where: whereClause,
+            attributes: ['id', 'username', 'name', 'email', 'role', 'pharmacy_id', 'created_at', 'avatar']
+        });
+        
         res.status(200).json(users);
     } catch (error) {
+        console.error('Error retrieving users:', error);
         res.status(500).json({ error: 'Failed to retrieve users' });
     }
 };
 
 // Create a new user
 exports.createUser = async (req, res) => {
-    const { username, password, name, email, role } = req.body;
+    const { username, password, name, email, role, pharmacy_id } = req.body;
 
     try {
+        // Validate required fields
+        if (!username || !password || !name || !email || !role) {
+            return res.status(400).json({ error: 'Username, password, name, email, and role are required' });
+        }
+
+        // Determine pharmacy_id based on user role and request
+        let userPharmacyId;
+        
+        if (req.user.role === 'admin') {
+            // Admin can specify pharmacy_id or default to their own
+            userPharmacyId = pharmacy_id || req.user.pharmacy_id;
+        } else {
+            // Non-admin users can only create users in their own pharmacy
+            userPharmacyId = req.user.pharmacy_id;
+        }
+
         const hashedPassword = await bcrypt.hash(password, 10);
 
         const newUser = await User.create({
@@ -38,10 +66,15 @@ exports.createUser = async (req, res) => {
             password: hashedPassword,
             name,
             email,
-            role
+            role,
+            pharmacy_id: userPharmacyId
         });
 
-        res.status(201).json(newUser);
+        // Remove password from response
+        const userResponse = { ...newUser.toJSON() };
+        delete userResponse.password;
+
+        res.status(201).json(userResponse);
     } catch (error) {
         if (error.name === 'SequelizeUniqueConstraintError') {
             console.error('Unique constraint error:', error.errors);
@@ -91,7 +124,7 @@ exports.loginUser = async (req, res) => {
 
         // Generate token
         const token = jwt.sign(
-            { id: user.id, username: user.username, role: user.role },
+            { id: user.id, username: user.username, role: user.role, pharmacy_id: user.pharmacy_id },
             process.env.JWT_SECRET || 'Anhthu@91',
             { expiresIn: '1h' }
         );
@@ -104,6 +137,7 @@ exports.loginUser = async (req, res) => {
                 id: user.id,
                 username: user.username,
                 role: user.role,
+                pharmacy_id: user.pharmacy_id,
                 avatar: user.avatarUrl
             }
         });
@@ -126,7 +160,7 @@ exports.getUserProfile = async (req, res) => {
     const userId = req.user.id;
     try {
         const user = await User.findByPk(userId, {
-            attributes: ['id', 'username', 'name', 'email', 'role', 'created_at', 'avatar', 'avatarUrl']
+            attributes: ['id', 'username', 'name', 'email', 'role', 'pharmacy_id', 'created_at', 'avatar', 'avatarUrl']
         });
         if (!user) {
             return res.status(404).json({ error: 'User not found' });
@@ -226,16 +260,24 @@ exports.forgotPassword = async (req, res) => {
     }
 };
 
-// Get user by ID
+// Get user by ID (with pharmacy authorization)
 exports.getUserById = async (req, res) => {
     const { id } = req.params;
     try {
-        const user = await User.findByPk(id, {
-            attributes: ['id', 'username', 'name', 'email', 'role', 'created_at']
+        const whereClause = { id };
+        
+        // Non-admin users can only access users from their own pharmacy
+        if (req.user.role !== 'admin') {
+            whereClause.pharmacy_id = req.user.pharmacy_id;
+        }
+
+        const user = await User.findOne({
+            where: whereClause,
+            attributes: ['id', 'username', 'name', 'email', 'role', 'pharmacy_id', 'created_at', 'avatar']
         });
         
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found or access denied' });
         }
         
         res.status(200).json(user);
@@ -245,13 +287,35 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-// Delete user
+// Delete user (with pharmacy authorization)
 exports.deleteUser = async (req, res) => {
     const { id } = req.params;
     try {
-        const user = await User.findByPk(id);
+        // Prevent users from deleting themselves
+        if (parseInt(id) === req.user.id) {
+            return res.status(400).json({ error: 'Cannot delete your own account' });
+        }
+
+        const whereClause = { id };
+        
+        // Non-admin users can only delete users from their own pharmacy
+        if (req.user.role !== 'admin') {
+            whereClause.pharmacy_id = req.user.pharmacy_id;
+        }
+
+        const user = await User.findOne({ where: whereClause });
         if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+            return res.status(404).json({ error: 'User not found or access denied' });
+        }
+
+        // Delete avatar from Cloudinary if exists
+        if (user.avatarPublicId) {
+            try {
+                await cloudinary.uploader.destroy(user.avatarPublicId);
+            } catch (cloudinaryError) {
+                console.error('Error deleting avatar from Cloudinary:', cloudinaryError);
+                // Continue with user deletion even if avatar deletion fails
+            }
         }
         
         await user.destroy();
@@ -262,25 +326,46 @@ exports.deleteUser = async (req, res) => {
     }
 };
 
-// Edit user by ID
+// Edit user by ID (with pharmacy authorization)
 exports.editUserById = async (req, res) => {
     const { id } = req.params;
-    const { username, name, email, role } = req.body;
+    const { username, name, email, role, pharmacy_id } = req.body;
     
     try {
-        const user = await User.findByPk(id);
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
+        const whereClause = { id };
+        
+        // Non-admin users can only edit users from their own pharmacy
+        if (req.user.role !== 'admin') {
+            whereClause.pharmacy_id = req.user.pharmacy_id;
         }
 
+        const user = await User.findOne({ where: whereClause });
+        if (!user) {
+            return res.status(404).json({ error: 'User not found or access denied' });
+        }
+
+        // Update fields
         if (username) user.username = username;
         if (name) user.name = name;
         if (email) user.email = email;
         if (role) user.role = role;
+        
+        // Only admin can change pharmacy_id
+        if (pharmacy_id && req.user.role === 'admin') {
+            user.pharmacy_id = pharmacy_id;
+        }
 
         await user.save();
-        res.status(200).json(user);
+        
+        // Remove password from response
+        const userResponse = { ...user.toJSON() };
+        delete userResponse.password;
+        
+        res.status(200).json(userResponse);
     } catch (error) {
+        if (error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ error: 'Username or email already exists' });
+        }
         console.error('Error updating user:', error);
         res.status(500).json({ error: 'Failed to update user' });
     }

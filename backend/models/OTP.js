@@ -17,11 +17,11 @@ OTP.init({
     type: DataTypes.STRING,
     allowNull: false
   },
-  expiresAt: {
+  expires_at: {
     type: DataTypes.DATE,
     allowNull: false
   },
-  isUsed: {
+  is_used: {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   }
@@ -29,7 +29,10 @@ OTP.init({
   sequelize,
   modelName: 'OTP',
   tableName: 'otps',
-  timestamps: true
+  timestamps: true,
+  underscored: true,
+  createdAt: 'created_at',
+  updatedAt: 'updated_at'
 });
 
 module.exports = OTP;

@@ -8,6 +8,14 @@ const Allergy = sequelize.define('Allergy', {
         primaryKey: true,
         autoIncrement: true,
     },
+    customer_id: {
+        type: DataTypes.INTEGER,
+        allowNull: false,
+        references: {
+            model: 'Customers',
+            key: 'id'
+        }
+    },
     name: {
         type: DataTypes.STRING(100),
         allowNull: false,

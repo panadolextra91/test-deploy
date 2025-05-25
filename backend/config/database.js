@@ -40,22 +40,9 @@ const initializeDatabase = async () => {
         await sequelize.authenticate();
         console.log('Database connection has been established successfully.');
         
-        // In development, sync the models
-        if (process.env.NODE_ENV === 'development') {
-            try {
-                await sequelize.sync({ alter: true });
-                console.log('Database models synchronized successfully.');
-            } catch (syncError) {
-                console.error('Error syncing models:', syncError);
-                // Log the full error details
-                console.error('Sync error details:', {
-                    message: syncError.message,
-                    stack: syncError.stack,
-                    name: syncError.name,
-                    parent: syncError.parent
-                });
-            }
-        }
+        // Note: Database syncing disabled to prevent duplicate constraints
+        // Use migrations for all schema changes instead of sync
+        console.log('Database sync disabled - using migrations for schema management');
     } catch (error) {
         console.error('Unable to connect to the database:', {
             message: error.message,

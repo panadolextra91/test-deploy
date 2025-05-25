@@ -16,6 +16,7 @@ const HealthMetrics = require('./HealthMetrics');
 const HealthRecord = require('./HealthRecord');
 const HealthMetricsHistory = require('./HealthMetricsHistory');
 const Allergy = require('./Allergy');
+const News = require('./News');
 
 //index.js
 // Define associations here after all models are loaded
@@ -198,5 +199,6 @@ module.exports = {
     HealthMetrics,
     HealthRecord,
     HealthMetricsHistory,
-    Allergy
+    Allergy,
+    News
 };

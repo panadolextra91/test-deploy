@@ -97,8 +97,8 @@ exports.requestOTP = async (req, res) => {
 
     // Generate OTP
     const otp = generateOTP();
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 5); // OTP expires in 5 minutes
+    const expires_at = new Date();
+    expires_at.setMinutes(expires_at.getMinutes() + 5); // OTP expires in 5 minutes
 
     // Hash the OTP before saving
     const hashedOTP = await bcrypt.hash(otp, 10);
@@ -107,8 +107,8 @@ exports.requestOTP = async (req, res) => {
     await OTP.create({
       phone,
       otp: hashedOTP,
-      expiresAt,
-      isUsed: false
+      expires_at,
+      is_used: false
     });
 
     // Send OTP to customer's email
@@ -125,7 +125,7 @@ exports.requestOTP = async (req, res) => {
     res.json({ 
       success: true, 
       message: `OTP sent to your registered email: ${customer.email}`,
-      expiresAt,
+      expires_at,
       email: customer.email,
       emailSent: true
     });
@@ -148,10 +148,10 @@ exports.verifyOTP = async (req, res) => {
     const otpRecord = await OTP.findOne({
       where: {
         phone,
-        isUsed: false,
-        expiresAt: { [Op.gt]: new Date() }
+        is_used: false,
+        expires_at: { [Op.gt]: new Date() }
       },
-      order: [['createdAt', 'DESC']]
+      order: [['created_at', 'DESC']]
     });
 
     if (!otpRecord) {
@@ -165,7 +165,7 @@ exports.verifyOTP = async (req, res) => {
     }
 
     // Mark OTP as used
-    await otpRecord.update({ isUsed: true });
+    await otpRecord.update({ is_used: true });
 
     // Find customer
     const customer = await Customer.findOne({ where: { phone } });

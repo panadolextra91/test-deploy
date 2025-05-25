@@ -41,15 +41,9 @@ HealthRecord.init({
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  imagePublicId: {
+  image_public_id: {
     type: DataTypes.STRING(255),
     allowNull: true
-  },
-  fileUrl: {
-    type: DataTypes.VIRTUAL,
-    get() {
-      return this.file_url;
-    }
   }
 }, {
   sequelize,

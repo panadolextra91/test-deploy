@@ -14,7 +14,6 @@ const PharmaSalesRep = sequelize.define('PharmaSalesRep', {
     email: {
         type: DataTypes.STRING,
         allowNull: false,
-        unique: true,
         validate: {
             isEmail: true
         }
@@ -27,14 +26,21 @@ const PharmaSalesRep = sequelize.define('PharmaSalesRep', {
         type: DataTypes.INTEGER,
         allowNull: false,
         references: {
-            model: 'Supplier',
+            model: 'suppliers',
             key: 'id'
         }
     }
 }, {
     tableName: 'pharma_sales_reps',
     timestamps: false,
-    underscored: true
+    underscored: true,
+    indexes: [
+        {
+            unique: true,
+            fields: ['email'],
+            name: 'pharma_sales_reps_email_unique'
+        }
+    ]
 });
 
 module.exports = PharmaSalesRep; 

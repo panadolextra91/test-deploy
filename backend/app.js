@@ -31,6 +31,7 @@ const authRoutes = require('./routes/authRoutes');
 const healthRecordRoutes = require('./routes/healthRecordRoutes');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
 const allergyRoutes = require('./routes/allergyRoutes');
+const newsRoutes = require('./routes/newsRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -72,12 +73,7 @@ sequelize.authenticate()
   .then(() => console.log('Database connected...'))
   .catch(err => console.error('Unable to connect to DB:', err));
 
-// Sync in development if enabled
-if (process.env.NODE_ENV === 'development' && process.env.ENABLE_DB_SYNC === 'true') {
-  sequelize.sync({ alter: true })
-    .then(() => console.log('Models synchronized successfully.'))
-    .catch(err => console.error('Error syncing models:', err));
-}
+// Note: Database syncing is handled in config/database.js
 
 // Routes
 app.get('/', (req, res) => res.send('Welcome to the Pharmacy Management System API'));
@@ -100,6 +96,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/health-records', healthRecordRoutes);
 app.use('/api/health-metrics', healthMetricsRoutes);
 app.use('/api/allergies', allergyRoutes);
+app.use('/api/news', newsRoutes);
 
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

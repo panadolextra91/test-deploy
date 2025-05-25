@@ -18,7 +18,6 @@ Customer.init(
     phone: {
       type: DataTypes.STRING,
       allowNull: true,
-      unique: 'uniq_phone',    // named unique constraint
     },
     email: {
       type: DataTypes.STRING,

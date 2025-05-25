@@ -1,14 +1,20 @@
 // models/Product.js
 const { DataTypes } = require('sequelize');
 const sequelize       = require('../config/database');
-const Supplier        = require('./Supplier');
-const PharmaSalesRep  = require('./PharmaSalesRep');
 
 const Product = sequelize.define('Product', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
+  },
+  supplier_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'suppliers',
+      key: 'id'
+    }
   },
   brand: {
     type: DataTypes.STRING,
@@ -39,11 +45,5 @@ const Product = sequelize.define('Product', {
   underscored: true,
   timestamps: true
 });
-
-// Associations
-Product.belongsTo(Supplier,  { foreignKey: 'supplier_id' });
-Supplier.hasMany(Product,    { foreignKey: 'supplier_id' });
-Product.belongsTo(PharmaSalesRep, { foreignKey: 'pharma_sales_rep_id' });
-PharmaSalesRep.hasMany(Product, { foreignKey: 'pharma_sales_rep_id' });
 
 module.exports = Product;
