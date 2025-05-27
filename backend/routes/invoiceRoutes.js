@@ -15,5 +15,8 @@ router.delete('/:id', authenticateToken, authorize('admin', 'pharmacist'), invoi
 router.get('/revenue/monthly', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getMonthlyRevenue);
 router.get('/sales/selling-medicines', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getSellingMedicines);
 router.get('/sales/daily-income', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getDailyIncome);
+router.get('/sales/top-brands', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getTopSellingBrands);
+router.get('/sales/top-brands-by-date', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getTopSellingBrandsByDateRange);
+router.get('/sales/by-category', authenticateToken, authorize('admin', 'pharmacist'), invoiceController.getSalesByCategory);
 
 module.exports = router;

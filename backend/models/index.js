@@ -12,6 +12,7 @@ const Order = require('./Order');
 const OrderItem = require('./OrderItem');
 const PharmaSalesRep = require('./PharmaSalesRep');
 const Brand = require('./Brand');
+const Category = require('./Category');
 const HealthMetrics = require('./HealthMetrics');
 const HealthRecord = require('./HealthRecord');
 const HealthMetricsHistory = require('./HealthMetricsHistory');
@@ -60,6 +61,10 @@ Product.belongsTo(Supplier, { foreignKey: 'supplier_id', as: 'supplier' });
 // Brand ↔ Medicine
 Brand.hasMany(Medicine, { foreignKey: 'brand_id', as: 'medicines', onDelete: 'SET NULL' });
 Medicine.belongsTo(Brand, { foreignKey: 'brand_id', as: 'brand' });
+
+// Category ↔ Medicine
+Category.hasMany(Medicine, { foreignKey: 'category_id', as: 'medicines', onDelete: 'CASCADE' });
+Medicine.belongsTo(Category, { foreignKey: 'category_id', as: 'category' });
 
 // User ↔ Pharmacy (only this relationship remains)
 User.belongsTo(Pharmacy, {
@@ -196,6 +201,7 @@ module.exports = {
     OrderItem,
     PharmaSalesRep,
     Brand,
+    Category,
     HealthMetrics,
     HealthRecord,
     HealthMetricsHistory,

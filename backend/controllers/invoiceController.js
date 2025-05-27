@@ -1,6 +1,6 @@
 // invoiceController.js
 
-const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier, Brand } = require('../models'); // Ensure models are imported
+const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier, Brand, Category } = require('../models'); // Ensure models are imported
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 
@@ -622,3 +622,273 @@ exports.updateInvoice = async (req, res) => {
             res.status(500).json({ error: 'Failed to fetch daily income' });
         }
     };
+
+// Get top 5 selling brands
+exports.getTopSellingBrands = async (req, res) => {
+    try {
+        console.log('Fetching top selling brands data...');
+
+        // Query to get top 5 brands by total quantity sold
+        const topBrands = await InvoiceItem.findAll({
+            attributes: [
+                [sequelize.col('medicine.brand.id'), 'brand_id'],
+                [sequelize.col('medicine.brand.name'), 'brand_name'],
+                [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold'],
+                [sequelize.fn('SUM', sequelize.literal('InvoiceItem.quantity * InvoiceItem.price')), 'total_revenue']
+            ],
+            include: [
+                {
+                    model: Medicine,
+                    as: 'medicine',
+                    attributes: [],
+                    required: true,
+                    include: [
+                        {
+                            model: Brand,
+                            as: 'brand',
+                            attributes: [],
+                            required: true
+                        }
+                    ]
+                },
+                {
+                    model: Invoice,
+                    as: 'invoice',
+                    attributes: [],
+                    where: { type: 'sale' },
+                    required: true
+                }
+            ],
+            group: ['medicine.brand.id', 'medicine.brand.name'],
+            order: [[sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'DESC']],
+            limit: 5,
+            raw: true
+        });
+
+        // Format the response
+        const formattedTopBrands = topBrands.map((brand, index) => ({
+            rank: index + 1,
+            brand_id: brand.brand_id,
+            brand_name: brand.brand_name,
+            total_quantity_sold: parseInt(brand.total_quantity_sold),
+            total_revenue: parseFloat(brand.total_revenue).toFixed(2)
+        }));
+
+        console.log('Top 5 Selling Brands:', JSON.stringify(formattedTopBrands, null, 2));
+
+        res.status(200).json({
+            success: true,
+            data: formattedTopBrands,
+            message: 'Top 5 selling brands retrieved successfully'
+        });
+    } catch (error) {
+        console.error('Error in getTopSellingBrands:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch top selling brands data',
+            details: error.message 
+        });
+    }
+};
+
+// Get top 5 selling brands by date range
+exports.getTopSellingBrandsByDateRange = async (req, res) => {
+    try {
+        const { startDate, endDate } = req.query;
+        
+        // Validate date parameters
+        if (!startDate || !endDate) {
+            return res.status(400).json({
+                success: false,
+                error: 'Both startDate and endDate are required'
+            });
+        }
+
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        
+        // Set end date to end of day
+        end.setHours(23, 59, 59, 999);
+
+        console.log(`Fetching top selling brands from ${start} to ${end}...`);
+
+        // Query to get top 5 brands by total quantity sold within date range
+        const topBrands = await InvoiceItem.findAll({
+            attributes: [
+                [sequelize.col('medicine.brand.id'), 'brand_id'],
+                [sequelize.col('medicine.brand.name'), 'brand_name'],
+                [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold'],
+                [sequelize.fn('SUM', sequelize.literal('InvoiceItem.quantity * InvoiceItem.price')), 'total_revenue'],
+                [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('invoice.id'))), 'number_of_transactions']
+            ],
+            include: [
+                {
+                    model: Medicine,
+                    as: 'medicine',
+                    attributes: [],
+                    required: true,
+                    include: [
+                        {
+                            model: Brand,
+                            as: 'brand',
+                            attributes: [],
+                            required: true
+                        }
+                    ]
+                },
+                {
+                    model: Invoice,
+                    as: 'invoice',
+                    attributes: [],
+                    where: { 
+                        type: 'sale',
+                        invoice_date: { [Op.between]: [start, end] }
+                    },
+                    required: true
+                }
+            ],
+            group: ['medicine.brand.id', 'medicine.brand.name'],
+            order: [[sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'DESC']],
+            limit: 5,
+            raw: true
+        });
+
+        // Format the response
+        const formattedTopBrands = topBrands.map((brand, index) => ({
+            rank: index + 1,
+            brand_id: brand.brand_id,
+            brand_name: brand.brand_name,
+            total_quantity_sold: parseInt(brand.total_quantity_sold),
+            total_revenue: parseFloat(brand.total_revenue).toFixed(2),
+            number_of_transactions: parseInt(brand.number_of_transactions),
+            average_quantity_per_transaction: (parseInt(brand.total_quantity_sold) / parseInt(brand.number_of_transactions)).toFixed(2)
+        }));
+
+        console.log('Top 5 Selling Brands by Date Range:', JSON.stringify(formattedTopBrands, null, 2));
+
+        res.status(200).json({
+            success: true,
+            data: formattedTopBrands,
+            dateRange: {
+                start: startDate,
+                end: endDate
+            },
+            message: 'Top 5 selling brands for date range retrieved successfully'
+        });
+    } catch (error) {
+        console.error('Error in getTopSellingBrandsByDateRange:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch top selling brands data for date range',
+            details: error.message 
+        });
+    }
+};
+
+// Get sales by medicine category
+exports.getSalesByCategory = async (req, res) => {
+    try {
+        const { startDate, endDate, type = 'revenue' } = req.query;
+        
+        console.log('Fetching sales by category data...');
+
+        // Build date filter if provided
+        let dateFilter = {};
+        if (startDate && endDate) {
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            dateFilter = { invoice_date: { [Op.between]: [start, end] } };
+        }
+
+        // Query to get sales data grouped by category
+        const salesByCategory = await InvoiceItem.findAll({
+            attributes: [
+                [sequelize.col('medicine.category.id'), 'category_id'],
+                [sequelize.col('medicine.category.name'), 'category_name'],
+                [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold'],
+                [sequelize.fn('SUM', sequelize.literal('InvoiceItem.quantity * InvoiceItem.price')), 'total_revenue'],
+                [sequelize.fn('COUNT', sequelize.fn('DISTINCT', sequelize.col('invoice.id'))), 'number_of_transactions']
+            ],
+            include: [
+                {
+                    model: Medicine,
+                    as: 'medicine',
+                    attributes: [],
+                    required: true,
+                    include: [
+                        {
+                            model: Category,
+                            as: 'category',
+                            attributes: [],
+                            required: true
+                        }
+                    ]
+                },
+                {
+                    model: Invoice,
+                    as: 'invoice',
+                    attributes: [],
+                    where: { 
+                        type: 'sale',
+                        ...dateFilter
+                    },
+                    required: true
+                }
+            ],
+            group: ['medicine.category.id', 'medicine.category.name'],
+            order: [
+                type === 'revenue' 
+                    ? [sequelize.fn('SUM', sequelize.literal('InvoiceItem.quantity * InvoiceItem.price')), 'DESC']
+                    : [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'DESC']
+            ],
+            raw: true
+        });
+
+        // Calculate total for percentage calculation
+        const totalValue = salesByCategory.reduce((sum, category) => {
+            return sum + (type === 'revenue' 
+                ? parseFloat(category.total_revenue) 
+                : parseInt(category.total_quantity_sold));
+        }, 0);
+
+        // Format the response with percentages
+        const formattedSalesData = salesByCategory.map((category) => {
+            const value = type === 'revenue' 
+                ? parseFloat(category.total_revenue) 
+                : parseInt(category.total_quantity_sold);
+            const percentage = totalValue > 0 ? ((value / totalValue) * 100).toFixed(2) : 0;
+
+            return {
+                category_id: category.category_id,
+                category_name: category.category_name,
+                total_quantity_sold: parseInt(category.total_quantity_sold),
+                total_revenue: parseFloat(category.total_revenue).toFixed(2),
+                number_of_transactions: parseInt(category.number_of_transactions),
+                percentage: parseFloat(percentage),
+                value: type === 'revenue' ? parseFloat(category.total_revenue) : parseInt(category.total_quantity_sold)
+            };
+        });
+
+        console.log('Sales by Category:', JSON.stringify(formattedSalesData, null, 2));
+
+        res.status(200).json({
+            success: true,
+            data: formattedSalesData,
+            summary: {
+                total_categories: formattedSalesData.length,
+                total_value: totalValue,
+                type: type,
+                date_range: startDate && endDate ? { start: startDate, end: endDate } : null
+            },
+            message: 'Sales by category retrieved successfully'
+        });
+    } catch (error) {
+        console.error('Error in getSalesByCategory:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Failed to fetch sales by category data',
+            details: error.message 
+        });
+    }
+};

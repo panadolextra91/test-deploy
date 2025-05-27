@@ -1,11 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
     EditOutlined,
     DeleteOutlined,
     PlusOutlined,
     UserOutlined,
+    BellOutlined,
 } from "@ant-design/icons";
-import { Table, Button, message, Avatar, Modal, Tag } from "antd"; // Modal is not used, can be removed if not planned for future
+import { Table, Button, message, Avatar, Modal, Tag, Badge, Dropdown, List, Spin } from "antd"; // Modal is not used, can be removed if not planned for future
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
 import AddUserForm from "./AddUserForm";
@@ -21,10 +22,18 @@ const UserManage = () => {
     const [isEditUserVisible, setIsEditUserVisible] = useState(false);
     const [editingUser, setEditingUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const backendUrl = process.env.REACT_APP_BACKEND_URL;
     const [avatarUrl, setAvatarUrl] = useState(() => {
         const savedAvatarUrl = sessionStorage.getItem('userAvatarUrl');
-        return savedAvatarUrl ? `${process.env.REACT_APP_BACKEND_URL}${savedAvatarUrl}` : null;
+        return savedAvatarUrl ? `${backendUrl}${savedAvatarUrl}` : null;
     });
+
+    // Notification states
+    const [notifications, setNotifications] = useState([]);
+    const [notificationCount, setNotificationCount] = useState(0);
+    const [notificationLoading, setNotificationLoading] = useState(false);
+    const [notificationDropdownOpen, setNotificationDropdownOpen] = useState(false);
+    const [userId, setUserId] = useState(null);
 
     const userRole = sessionStorage.getItem("userRole");
 
@@ -32,13 +41,24 @@ const UserManage = () => {
         fetchUsers();
         if (!sessionStorage.getItem('userAvatarUrl')) {
             fetchUserProfile();
+        } else {
+            fetchUserProfile(); // Still fetch for userId
         }
     }, []);
+
+    // Fetch notifications when userId is available
+    useEffect(() => {
+        if (userId) {
+            const token = sessionStorage.getItem('token');
+            fetchNotifications(token);
+            fetchNotificationCount(token);
+        }
+    }, [userId]);
 
     const fetchUserProfile = async () => {
         const token = sessionStorage.getItem('token');
         try {
-            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users/profile`, {
+            const response = await axios.get(`${backendUrl}/api/users/profile`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             
@@ -49,9 +69,84 @@ const UserManage = () => {
                 sessionStorage.removeItem('userAvatarUrl');
                 setAvatarUrl(null);
             }
+            setUserId(response.data.id);
         } catch (error) {
             console.error("Failed to fetch user profile:", error);
             setAvatarUrl(null);
+        }
+    };
+
+    const fetchNotifications = async (token) => {
+        if (!userId) return;
+        
+        setNotificationLoading(true);
+        try {
+            const response = await axios.get(
+                `${backendUrl}/api/notifications/user/${userId}`,
+                {
+                    headers: { Authorization: `Bearer ${token}` },
+                    params: { include_resolved: 'false' }
+                }
+            );
+            setNotifications(response.data);
+        } catch (error) {
+            console.error("Failed to fetch notifications:", error);
+            message.error("Unable to load notifications.");
+        } finally {
+            setNotificationLoading(false);
+        }
+    };
+
+    const fetchNotificationCount = async (token) => {
+        if (!userId) return;
+        
+        try {
+            const response = await axios.get(
+                `${backendUrl}/api/notifications/user/${userId}/unread/count`,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            setNotificationCount(response.data.count);
+        } catch (error) {
+            console.error("Failed to fetch notification count:", error);
+        }
+    };
+
+    const markNotificationAsRead = async (notificationId) => {
+        const token = sessionStorage.getItem('token');
+        try {
+            await axios.patch(
+                `${backendUrl}/api/notifications/${notificationId}/read`,
+                {},
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            fetchNotifications(token);
+            fetchNotificationCount(token);
+        } catch (error) {
+            console.error("Failed to mark notification as read:", error);
+            message.error("Unable to mark notification as read.");
+        }
+    };
+
+    const markAllNotificationsAsRead = async () => {
+        const token = sessionStorage.getItem('token');
+        try {
+            await axios.patch(
+                `${backendUrl}/api/notifications/user/${userId}/read/all`,
+                {},
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            fetchNotifications(token);
+            fetchNotificationCount(token);
+            message.success("All notifications marked as read.");
+        } catch (error) {
+            console.error("Failed to mark all notifications as read:", error);
+            message.error("Unable to mark all notifications as read.");
         }
     };
 
@@ -63,7 +158,7 @@ const UserManage = () => {
         setLoading(true);
         try {
             const token = sessionStorage.getItem("token");
-            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/users`, {
+            const response = await axios.get(`${backendUrl}/api/users`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(response.data);
@@ -79,7 +174,7 @@ const UserManage = () => {
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.post(
-                `${process.env.REACT_APP_BACKEND_URL}/api/users`,
+                `${backendUrl}/api/users`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -102,7 +197,7 @@ const UserManage = () => {
         try {
             const token = sessionStorage.getItem("token");
             const response = await axios.put(
-                `${process.env.REACT_APP_BACKEND_URL}/api/users/${editingUser.id}`,
+                `${backendUrl}/api/users/${editingUser.id}`,
                 values,
                 {
                     headers: { Authorization: `Bearer ${token}` },
@@ -142,7 +237,7 @@ const UserManage = () => {
 
         try {
             const token = sessionStorage.getItem("token");
-            await axios.delete(`${process.env.REACT_APP_BACKEND_URL}/api/users/${id}`, {
+            await axios.delete(`${backendUrl}/api/users/${id}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
             setUsers(users.filter((user) => user.id !== id));
@@ -220,6 +315,50 @@ const UserManage = () => {
         },
     ];
 
+    const notificationDropdownItems = [
+        {
+            key: 'notifications',
+            label: (
+                <div style={{ width: 350, maxHeight: 400, overflow: 'auto' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderBottom: '1px solid #f0f0f0', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: 'bold', fontSize: '14px' }}>Notifications ({notificationCount})</span>
+                        {notificationCount > 0 && (
+                            <Button type="link" size="small" onClick={(e) => { e.stopPropagation(); markAllNotificationsAsRead(); }} style={{ padding: 0, fontSize: '12px' }}>
+                                Mark all as read
+                            </Button>
+                        )}
+                    </div>
+                    {notificationLoading ? (
+                        <div style={{ textAlign: 'center', padding: '20px' }}><Spin size="small" /></div>
+                    ) : notifications.length === 0 ? (
+                        <div style={{ textAlign: 'center', padding: '20px', color: '#999', fontSize: '14px' }}>No new notifications</div>
+                    ) : (
+                        <List
+                            size="small"
+                            dataSource={notifications}
+                            renderItem={(notification) => (
+                                <List.Item
+                                    style={{ padding: '8px 12px', cursor: 'pointer', backgroundColor: notification.is_read ? '#fff' : '#f6ffed', borderBottom: '1px solid #f0f0f0' }}
+                                    onClick={(e) => { e.stopPropagation(); if (!notification.is_read) markNotificationAsRead(notification.id); }}
+                                >
+                                    <List.Item.Meta
+                                        title={<div style={{ fontSize: '13px', fontWeight: notification.is_read ? 'normal' : 'bold', marginBottom: '4px' }}>{notification.title}</div>}
+                                        description={
+                                            <div>
+                                                <div style={{ fontSize: '12px', color: '#666', marginBottom: '4px' }}>{notification.message}</div>
+                                                <div style={{ fontSize: '11px', color: '#999' }}>{new Date(notification.created_at).toLocaleString()}</div>
+                                            </div>
+                                        }
+                                    />
+                                </List.Item>
+                            )}
+                        />
+                    )}
+                </div>
+            ),
+        },
+    ];
+
     return (
         <div className="medicines-container"> {/* Consider renaming className if it's generic */}
             {userRole === "admin" ? <AdminSidebar /> : <PharmacistSidebar />}
@@ -230,7 +369,18 @@ const UserManage = () => {
                         <h1>User Management</h1>
                         <p>Dashboard / User Management</p>
                     </div>
-                    <div className="header-right">
+                    <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                        <Dropdown
+                            menu={{ items: notificationDropdownItems }}
+                            trigger={['click']}
+                            open={notificationDropdownOpen}
+                            onOpenChange={setNotificationDropdownOpen}
+                            placement="bottomRight"
+                        >
+                            <Badge count={notificationCount} size="small">
+                                <Button type="text" icon={<BellOutlined />} size="large" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: '40px', height: '40px' }} />
+                            </Badge>
+                        </Dropdown>
                         <div onClick={handleAvatarClick} style={{ cursor: "pointer" }}>
                             <Avatar 
                                 size={50} 

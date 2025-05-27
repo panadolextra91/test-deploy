@@ -8,7 +8,8 @@ import {
     FileTextOutlined,
     LoginOutlined,
     DownOutlined,
-    ShopOutlined
+    ShopOutlined,
+    ShoppingOutlined
 } from '@ant-design/icons';
 import logo from '../imgs/MediMaster.png'; // Replace with the correct path to your logo file
 import './PharmacistSidebar.css';
@@ -78,6 +79,11 @@ const PharmacistSidebar = () => {
                     <li>
                         <a href="/sales-invoices">
                             <FileTextOutlined/> Sales & Invoices
+                        </a>
+                    </li>
+                    <li>
+                        <a href="/orders">
+                            <ShoppingOutlined /> Orders
                         </a>
                     </li>
                     <li>
