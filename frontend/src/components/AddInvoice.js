@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Form, Input, Button, Table, Select, InputNumber, message } from 'antd';
+import { Modal, Form, Input, Button, Table, Select, InputNumber, message, Tooltip } from 'antd';
 import axios from 'axios';
 import debounce from 'lodash.debounce';
 
@@ -230,11 +230,11 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                     product_id: selectedProduct.id,
                     name: product.name,
                     brand: product.brand,
-                    supplier: product.Supplier ? product.Supplier.name : '',
+                    supplier: product.supplier ? product.supplier.name : '',
                     quantity: itemQuantity,
                     price: price,
                     total: itemQuantity * price,
-                    available_quantity: maxAllowedQuantity,
+                    available_quantity: maxAllowedQuantity
                 };
                 setItems([...items, newItem]);
             }
@@ -310,6 +310,7 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                     product_id: item.product_id,
                     quantity: item.quantity,
                     price: item.price,
+                    brand: item.brand || '',
                 }));
             }
 
@@ -402,6 +403,7 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
             visible={visible}
             title="Add Invoice"
             onCancel={handleCancel}
+            width={700}
             footer={[
                 <Button key="cancel" onClick={handleCancel}>
                     Cancel
@@ -463,7 +465,16 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                                         value={medicine.id}
                                         disabled={medicine.quantity === 0}
                                     >
-                                        {medicine.name} {medicine.quantity > 0 ? `(${medicine.quantity} available)` : "(Out of stock)"}
+                                        <Tooltip title={
+                                            <div>
+                                                <p><strong>Brand:</strong> {medicine.brand || 'N/A'}</p>
+                                                <p><strong>Available Stock:</strong> {medicine.quantity}</p>
+                                                <p><strong>Price:</strong> ${parseFloat(medicine.price).toFixed(2)}</p>
+                                                {medicine.expiry_date && <p><strong>Expiry:</strong> {new Date(medicine.expiry_date).toLocaleDateString()}</p>}
+                                            </div>
+                                        }>
+                                            {medicine.name} {medicine.quantity <= 0 ? "(Out of stock)" : ""}
+                                        </Tooltip>
                                     </Option>
                                 ))}
                             </Select>
@@ -498,7 +509,16 @@ const AddInvoice = ({ visible, onCreate, onCancel }) => {
                             >
                                 {products.map((product) => (
                                     <Option key={product.id} value={product.id}>
-                                        {product.name} | Brand: {product.brand} | Supplier: {product.Supplier ? product.Supplier.name : ''} | Price: ${product.price}
+                                        <Tooltip title={
+                                            <div>
+                                                <p><strong>Brand:</strong> {product.brand || 'N/A'}</p>
+                                                <p><strong>Supplier:</strong> {product.supplier ? product.supplier.name : 'N/A'}</p>
+                                                <p><strong>Price:</strong> ${parseFloat(product.price).toFixed(2)}</p>
+                                                <p><strong>Available Stock:</strong> {product.quantity || 0}</p>
+                                            </div>
+                                        }>
+                                            {product.name}
+                                        </Tooltip>
                                     </Option>
                                 ))}
                             </Select>

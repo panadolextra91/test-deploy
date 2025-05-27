@@ -12,30 +12,28 @@ import {
   Button,
   message,
   Table,
-  Space,
   Tag,
   DatePicker,
   Select,
-  Input,
-  Search
+  Input
 } from "antd";
 import axios from "axios";
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import FilterAltOutlinedIcon from '@mui/icons-material/FilterAltOutlined';
-import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import './Suppliers.css'; // reuse styles
 
 const { MonthPicker } = DatePicker;
 const { Option } = Select;
+const { Search } = Input;
 
 const Products = () => {
   const [purchaseOrderModalVisible, setPurchaseOrderModalVisible] = useState(false);
   const [selectedRowKeys, setSelectedRowKeys] = useState([]);
   const [selectedRows, setSelectedRows] = useState([]);
   const [importModalVisible, setImportModalVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
   const [suppliers, setSuppliers] = useState([]);
@@ -84,35 +82,103 @@ const Products = () => {
   };
 
   const fetchProducts = async () => {
+    setLoading(true);
     const token = sessionStorage.getItem('token');
   
-    const params = {};
-    if (selectedSupplier) params.supplierId = selectedSupplier;
-    if (selectedMonth) params.month = dayjs(selectedMonth).format('YYYY-MM');
-  
     try {
-      const endpoint = searchQuery
-        ? `${process.env.REACT_APP_BACKEND_URL}/api/products/search`
-        : `${process.env.REACT_APP_BACKEND_URL}/api/products/filter`;
-  
+      let endpoint;
+      let params = {};
+      
+      // Determine which endpoint to use based on the search/filter criteria
+      if (searchQuery) {
+        // Search by product name
+        endpoint = `${process.env.REACT_APP_BACKEND_URL}/api/products/search`;
+        params = { q: searchQuery };
+      } else if (selectedSupplier || selectedMonth) {
+        // Filter by supplier ID and/or month
+        endpoint = `${process.env.REACT_APP_BACKEND_URL}/api/products/filter`;
+        if (selectedSupplier) params.supplierId = selectedSupplier;
+        if (selectedMonth) params.month = dayjs(selectedMonth).format('YYYY-MM');
+      } else {
+        // No filters, get all products
+        endpoint = `${process.env.REACT_APP_BACKEND_URL}/api/products`;
+      }
+      
       const res = await axios.get(endpoint, {
         headers: { Authorization: `Bearer ${token}` },
-        params: searchQuery ? { q: searchQuery } : params
+        params
       });
   
-      const data = res.data.map(prod => ({
-        key: prod.id,
-        name: prod.name,
-        brand: prod.brand,
-        price: prod.price,
-        expiry_date: prod.expiry_date,
-        supplier: prod.Supplier?.name,
-        created_at: prod.created_at
-      }));
+      // Log the structure of the first product to see what's available
+      if (res.data && res.data.length > 0) {
+        console.log('Product data structure:', JSON.stringify(res.data[0], null, 2));
+      }
+      
+      // When using the filter endpoint, we need to fetch additional sales rep data
+      // since that endpoint doesn't include it
+      if ((selectedSupplier || selectedMonth) && !searchQuery) {
+        // Get the product IDs from the filtered results
+        const productIds = res.data.map(prod => prod.id);
+        
+        // If we have products, fetch the complete data for each one
+        if (productIds.length > 0) {
+          try {
+            // Fetch complete product data including sales rep info
+            const detailedRes = await Promise.all(
+              productIds.map(id => 
+                axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/products/${id}`, {
+                  headers: { Authorization: `Bearer ${token}` }
+                })
+              )
+            );
+            
+            // Map the detailed data
+            const data = detailedRes.map(response => {
+              const prod = response.data;
+              return {
+                key: prod.id,
+                name: prod.name,
+                brand: prod.brand,
+                price: prod.price,
+                expiry_date: prod.expiry_date,
+                supplier: prod.supplier?.name,
+                supplier_id: prod.supplier_id,
+                sales_rep: prod.salesRep?.name || 'N/A',
+                sales_rep_email: prod.salesRep?.email,
+                created_at: prod.createdAt || prod.created_at
+              };
+            });
+            
+            setProducts(data);
+            return; // Exit early since we've set the products
+          } catch (error) {
+            console.error('Error fetching detailed product data:', error);
+            // Continue with original data if detailed fetch fails
+          }
+        }
+      }
+      
+      // Standard data mapping for non-filtered results or if detailed fetch failed
+      const data = res.data.map(prod => {
+        return {
+          key: prod.id,
+          name: prod.name,
+          brand: prod.brand,
+          price: prod.price,
+          expiry_date: prod.expiry_date,
+          supplier: prod.supplier?.name,
+          supplier_id: prod.supplier_id,
+          sales_rep: prod.salesRep?.name || 'N/A',
+          sales_rep_email: prod.salesRep?.email,
+          created_at: prod.createdAt || prod.created_at
+        };
+      });
   
       setProducts(data);
     } catch (err) {
       message.error("Failed to fetch products");
+    } finally {
+      setLoading(false);
     }
   };
   
@@ -131,21 +197,30 @@ const Products = () => {
   };
 
   const columns = [
-    { title: 'Name', dataIndex: 'name', key: 'name' },
-    { title: 'Brand', dataIndex: 'brand', key: 'brand' },
-    { title: 'Price ($)', dataIndex: 'price', key: 'price' },
+    { title: 'Name', dataIndex: 'name', key: 'name', align: 'center' },
+    { title: 'Brand', dataIndex: 'brand', key: 'brand', align: 'center' },
+    { title: 'Price ($)', dataIndex: 'price', key: 'price', align: 'center', render: price => parseFloat(price).toFixed(2) },
     {
       title: 'Expiry Date',
       dataIndex: 'expiry_date',
       key: 'expiry_date',
-      render: date => dayjs(date).format('YYYY-MM-DD')
+      align: 'center',
+      render: date => <Tag color="blue">{dayjs(date).format('YYYY-MM-DD')}</Tag>
     },
-    { title: 'Supplier', dataIndex: 'supplier', key: 'supplier' },
+    { title: 'Supplier', dataIndex: 'supplier', key: 'supplier', align: 'center' },
+    { 
+      title: 'Sales Rep', 
+      dataIndex: 'sales_rep', 
+      key: 'sales_rep', 
+      align: 'center',
+      render: rep => rep || 'N/A'
+    },
     {
       title: 'Created At',
       dataIndex: 'created_at',
       key: 'created_at',
-      render: date => <Tag>{dayjs(date).format('YYYY-MM-DD')}</Tag>
+      align: 'center',
+      render: date => <Tag color="blue">{dayjs(date).format('YYYY-MM-DD')}</Tag>
     }
   ];
 
@@ -160,6 +235,8 @@ const Products = () => {
   const handleMakePurchaseOrder = () => {
     setPurchaseOrderModalVisible(true);
   };
+
+  // Function removed to fix lint warning
 
   return (
     <div className="suppliers-container">
@@ -196,57 +273,74 @@ const Products = () => {
           </div>
         </header>
 
-        <section className="suppliers-table">
-          <Space style={{ marginBottom: 16 }}>
-            <Input
-              placeholder="Search product name"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              onPressEnter={fetchProducts}
-              allowClear
+        <div className="suppliers-table">
+          <div className="table-header" style={{ margin: '26px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+              <Search
+                placeholder="Search product name"
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                onSearch={fetchProducts}
+                allowClear
+                style={{ width: 250 }}
+              />
+              <Select
+                placeholder="Filter by supplier"
+                style={{ width: 180 }}
+                allowClear
+                onChange={value => setSelectedSupplier(value)}
+                value={selectedSupplier}
+              >
+                {suppliers.map(s => (
+                  <Option key={s.id} value={s.id}>{s.name}</Option>
+                ))}
+              </Select>
+              <MonthPicker
+                placeholder="Filter by month"
+                onChange={val => setSelectedMonth(val)}
+                value={selectedMonth}
+              />
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <Button 
+                  className="add-button"
+                  type="primary" 
+                  onClick={fetchProducts} 
+                  icon={<FilterOutlined />}
+                >
+                  Filter
+                </Button>
+                <Button
+                  className="add-button"
+                  icon={<FileAddOutlined />}
+                  type="primary"
+                  onClick={handleImportClick}
+                  >
+                  Import Product List
+                </Button>
+                <Button
+                  className="order-button"
+                  type="primary"
+                  onClick={handleMakePurchaseOrder}
+                  disabled={selectedRows.length === 0}
+                  icon={<ShoppingCartOutlined />}
+                >
+                  Bulk Order
+                </Button>
+              </div>
+            </div>
+          </div>
+          <div className="table-container">
+            <Table
+              rowSelection={rowSelection}
+              columns={columns}
+              dataSource={products}
+              loading={loading}
+              scroll={{ x: 1200 }}
+              size="small"
+              rowKey="key"
             />
-            <Select
-              placeholder="Filter by supplier"
-              style={{ width: 180 }}
-              allowClear
-              onChange={value => setSelectedSupplier(value)}
-              value={selectedSupplier}
-            >
-              {suppliers.map(s => (
-                <Option key={s.id} value={s.id}>{s.name}</Option>
-              ))}
-            </Select>
-            <MonthPicker
-              placeholder="Filter by month"
-              onChange={val => setSelectedMonth(val)}
-              value={selectedMonth}
-            />
-            <Button type="primary" onClick={fetchProducts} icon={<FilterOutlined />}>Filter</Button>
-            
-            <Button
-              icon={<FileAddOutlined />}
-              type="primary"
-              style={{ borderRadius: 50 }}
-              onClick={handleImportClick}
-            >
-              Import Product List
-            </Button>
-            <Button
-              type="primary"
-              onClick={handleMakePurchaseOrder}
-              style={{ borderRadius: 50 }}
-              disabled={selectedRows.length === 0}
-              icon={<ShoppingCartOutlined />}
-            >
-              Make Purchase Order
-            </Button>
-          </Space>
-          <Table
-            rowSelection={rowSelection}
-            columns={columns}
-            dataSource={products}
-          />
-        </section>
+          </div>
+        </div>
       </main>
     </div>
   );

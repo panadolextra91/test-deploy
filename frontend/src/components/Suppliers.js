@@ -172,21 +172,25 @@ const Suppliers = () => {
         {
             title: 'Name',
             dataIndex: 'name',
-            key: 'name'
+            key: 'name',
+            align: 'center'
         },
         {
             title: 'Contact',
             dataIndex: 'contact',
-            key: 'contact'
+            key: 'contact',
+            align: 'center'
         },
         {
             title: 'Address',
             dataIndex: 'address',
-            key: 'address'
+            key: 'address',
+            align: 'center'
         },
         {
             title: 'Actions',
             key: 'actions',
+            align: 'center',
             render: (text, record) => (
                 <Space size="middle">
                     <Button icon={<EditOutlined />} style={{ borderRadius: 50 }} onClick={() => showEditSupplierModal(record.key)}>Edit</Button>
@@ -220,13 +224,29 @@ const Suppliers = () => {
                         </div>
                     </div>
                 </header>
-                <section className="suppliers-table">
-                    <Button className='add-button' type="primary" icon={<PlusOutlined/>} onClick={showAddSupplierModal}
-                            style={{marginBottom: 16, borderRadius: 50}}>
-                        Add Supplier
-                    </Button>
-                    <Table columns={columns} dataSource={suppliers}/>
-                </section>
+                <div className="suppliers-table">
+                    <div className="table-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <Button
+                                className="add-button"
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={showAddSupplierModal}
+                            >
+                                Add Supplier
+                            </Button>
+                        </div>
+                    </div>
+                    <div className="table-container">
+                        <Table 
+                            columns={columns} 
+                            dataSource={suppliers}
+                            scroll={{ x: 800 }}
+                            size="small"
+                            rowKey="key"
+                        />
+                    </div>
+                </div>
                 <AddSupplierForm
                     visible={isAddModalVisible}
                     onCreate={handleAddSupplier}

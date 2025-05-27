@@ -95,12 +95,50 @@ exports.getAllMedicines = async (req, res) => {
 exports.getMedicineById = async (req, res) => {
     const { id } = req.params;
     try {
-        const medicine = await Medicine.findByPk(id);
-        if (!medicine) {
+        const query = `
+            SELECT 
+                medicines.*,
+                suppliers.name AS supplier_name,
+                locations.name AS location_name,
+                categories.name AS category_name,
+                brands.name AS brand_name,
+                brands.manufacturer AS brand_manufacturer
+            FROM 
+                medicines
+            LEFT JOIN 
+                suppliers ON medicines.supplier_id = suppliers.id
+            LEFT JOIN 
+                locations ON medicines.location_id = locations.id
+            LEFT JOIN 
+                categories ON medicines.category_id = categories.id
+            LEFT JOIN 
+                brands ON medicines.brand_id = brands.id
+            WHERE medicines.id = ?
+        `;
+
+        const medicine = await sequelize.query(query, { 
+            type: QueryTypes.SELECT,
+            replacements: [id],
+            raw: true
+        });
+
+        if (!medicine || medicine.length === 0) {
             return res.status(404).json({ error: 'Medicine not found' });
         }
-        res.status(200).json(medicine);
+
+        const medicineWithDetails = {
+            ...medicine[0],
+            supplier: medicine[0].supplier_name,
+            location: medicine[0].location_name,
+            category: medicine[0].category_name,
+            brand: medicine[0].brand_name,
+            brand_manufacturer: medicine[0].brand_manufacturer,
+            imageUrl: medicine[0].image || null
+        };
+
+        res.status(200).json(medicineWithDetails);
     } catch (error) {
+        console.error('Error retrieving medicine by ID:', error);
         res.status(500).json({ error: 'Failed to retrieve medicine' });
     }
 };
@@ -109,13 +147,49 @@ exports.getMedicineById = async (req, res) => {
 exports.getMedicineByName = async (req, res) => {
     const { name } = req.params;
     try {
-        const medicines = await Medicine.findAll({
-            where: { name: { [Op.like]: `%${name}%` } }
+        const query = `
+            SELECT 
+                medicines.*,
+                suppliers.name AS supplier_name,
+                locations.name AS location_name,
+                categories.name AS category_name,
+                brands.name AS brand_name,
+                brands.manufacturer AS brand_manufacturer
+            FROM 
+                medicines
+            LEFT JOIN 
+                suppliers ON medicines.supplier_id = suppliers.id
+            LEFT JOIN 
+                locations ON medicines.location_id = locations.id
+            LEFT JOIN 
+                categories ON medicines.category_id = categories.id
+            LEFT JOIN 
+                brands ON medicines.brand_id = brands.id
+            WHERE medicines.name LIKE ?
+            ORDER BY medicines.name ASC
+        `;
+
+        const medicines = await sequelize.query(query, { 
+            type: QueryTypes.SELECT,
+            replacements: [`%${name}%`],
+            raw: true
         });
+
         if (medicines.length === 0) {
             return res.status(404).json({ error: 'No medicines found' });
         }
-        res.status(200).json(medicines);
+
+        const medicinesWithDetails = medicines.map(medicine => ({
+            ...medicine,
+            supplier: medicine.supplier_name,
+            location: medicine.location_name,
+            category: medicine.category_name,
+            brand: medicine.brand_name,
+            brand_manufacturer: medicine.brand_manufacturer,
+            imageUrl: medicine.image || null
+        }));
+
+        res.status(200).json(medicinesWithDetails);
     } catch (error) {
         console.error('Error retrieving medicines by name:', error);
         res.status(500).json({ error: 'Failed to retrieve medicines' });

@@ -8,12 +8,14 @@ import {
     FileTextOutlined,
     LoginOutlined,
     DownOutlined,
+    ShopOutlined
 } from '@ant-design/icons';
 import logo from '../imgs/MediMaster.png'; // Replace with the correct path to your logo file
 import './PharmacistSidebar.css';
 import {useNavigate} from "react-router-dom"; // Optional: Import CSS for styling if needed
 import InventoryOutlinedIcon from '@mui/icons-material/InventoryOutlined';
 import ContactMailOutlinedIcon from '@mui/icons-material/ContactMailOutlined';
+import CoPresentOutlinedIcon from '@mui/icons-material/CoPresentOutlined';
 
 const PharmacistSidebar = () => {
     const navigate = useNavigate();
@@ -62,10 +64,16 @@ const PharmacistSidebar = () => {
                         </div>
                         {supplierOpen && (
                             <ul className="submenu">
-                                <li><a href="/suppliers"><ContactMailOutlinedIcon style={{marginRight: "10px", fontSize: "19px"}}/>Supplier List</a></li>
-                                <li><a href="/products"><InventoryOutlinedIcon style={{marginRight: "10px", fontSize: "19px"}}/>Product List</a></li>
+                                <li><a href="/suppliers" style={{fontSize: "15px"}}><ContactMailOutlinedIcon style={{marginRight: "10px", fontSize: "15px"}}/>Supplier List</a></li>
+                                <li><a href="/products" style={{fontSize: "15px"}}><InventoryOutlinedIcon style={{marginRight: "10px", fontSize: "15px"}}/>Product List</a></li>
+                                <li><a href="/pharma-sales-reps" style={{fontSize: "15px"}}><CoPresentOutlinedIcon style={{marginRight: "10px", fontSize: "15px"}}/>Pharma Sales Reps</a></li>
                             </ul>
                         )}
+                    </li>
+                    <li>
+                        <a href="/brands">
+                            <ShopOutlined /> Brands
+                        </a>
                     </li>
                     <li>
                         <a href="/sales-invoices">

@@ -60,6 +60,41 @@ exports.getSalesRepByName = async (req, res) => {
   }
 };
 
+// Filter sales reps by supplier
+exports.getSalesRepsBySupplier = async (req, res) => {
+  try {
+    const { supplierId } = req.params;
+
+    // Check if supplier exists
+    const supplier = await Supplier.findByPk(supplierId);
+    if (!supplier) {
+      return res.status(404).json({ error: 'Supplier not found' });
+    }
+
+    const salesReps = await PharmaSalesRep.findAll({
+      where: { supplier_id: supplierId },
+      include: [{ 
+        model: Supplier, 
+        attributes: ['id', 'name'],
+        as: 'supplier'
+      }],
+      order: [['name', 'ASC']]
+    });
+
+    res.json({
+      supplier: {
+        id: supplier.id,
+        name: supplier.name
+      },
+      sales_reps: salesReps,
+      count: salesReps.length
+    });
+  } catch (err) {
+    console.error('Error filtering sales reps by supplier:', err);
+    res.status(500).json({ error: 'Failed to filter sales reps by supplier' });
+  }
+};
+
 // Create new sales rep
 exports.createSalesRep = async (req, res) => {
   try {

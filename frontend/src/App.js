@@ -12,6 +12,10 @@ import UserManage from "./components/UserManage";
 import CustomerManage from "./components/CustomerManage";
 import ForgotPassword from "./components/ForgotPassword";
 import Products from "./components/Products";
+import PharmaSalesReps from "./components/PharmaSalesReps";
+import Brands from "./components/Brands";
+import ImportProductList from "./components/ImportProductList";
+import Orders from "./components/Orders";
 
 function App() {
     const ProtectedRoute = ({ children, roles }) => {
@@ -42,6 +46,7 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/" element={<Login />} />
                 <Route path='/forgot-password' element={<ForgotPassword />} />
+                <Route path='/import-product-list' element={<ImportProductList />} />
 
                 {/* Protected Routes */}
                 <Route path="/dashboard" element={
@@ -92,6 +97,21 @@ function App() {
                 <Route path='/customers-manage' element={
                     <ProtectedRoute roles={['admin', 'pharmacist']}>
                         <CustomerManage />
+                    </ProtectedRoute>
+                } />
+                <Route path='/pharma-sales-reps' element={
+                    <ProtectedRoute roles={['admin', 'pharmacist']}>
+                        <PharmaSalesReps />
+                    </ProtectedRoute>
+                } />
+                <Route path='/brands' element={
+                    <ProtectedRoute roles={['admin', 'pharmacist']}>
+                        <Brands />
+                    </ProtectedRoute>
+                } />
+                <Route path='/orders' element={
+                    <ProtectedRoute roles={['admin', 'pharmacist']}>
+                        <Orders />
                     </ProtectedRoute>
                 } />
             </Routes>

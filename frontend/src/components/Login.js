@@ -85,7 +85,6 @@ const Login = () => {
                             prefix={<UserOutlined />}
                         />
                     </div>
-                    <a href="/forgot-password" className="forgot-password">Forgot Password?</a>
                     <div className="input-group">
                         <label htmlFor="password">Password</label>
                         <Input
@@ -98,6 +97,7 @@ const Login = () => {
                             prefix={<LockOutlined />}
                         />
                     </div>
+                    <a href="/forgot-password" className="forgot-password">Forgot Password?</a>
 
                     <button type="submit" className="login-button">Sign In</button>
                     <a href="/import-product-list" className="sale-products-link">

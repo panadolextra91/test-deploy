@@ -1,11 +1,11 @@
-.sales-container {
+.orders-container {
     display: flex;
     height: 100vh;
     font-family: Arial, sans-serif;
     background-color: #f5f5f5;
 }
 
-.sales-table {
+.orders-table {
     background-color: #ffffff;
     border-radius: 8px;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
@@ -20,15 +20,12 @@
     width: 100%;
 }
 
-.add-button {
-    border-radius: 50px;
-    height: 40px;
-    display: flex;
-    align-items: center;
-}
-
 .search-bar {
     width: 300px;
+}
+
+.search-bar .ant-input-search-button {
+    border-radius: 4px;
 }
 
 .table-container {
@@ -58,6 +55,40 @@
 /* Style for the fixed columns */
 .table-container .ant-table-fixed {
     box-shadow: 6px 0 6px -4px rgba(0, 0, 0, 0.15);
+}
+
+/* Action buttons container */
+.action-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+/* Header styles */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 24px;
+    background-color: #fff;
+}
+
+.header-left h1 {
+    margin-bottom: 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+
+.header-left p {
+    margin-bottom: 0;
+    color: #888;
+    font-size: 14px;
+}
+
+.main-content {
+    flex: 1;
+    padding: 24px;
+    overflow-y: auto;
 }
 
 /* Make sure the table is responsive */

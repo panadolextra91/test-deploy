@@ -52,4 +52,7 @@ router.delete(
   pharmaSalesRepController.deleteSalesRep
 );
 
+// Filter sales reps by supplier
+router.get('/supplier/:supplierId', pharmaSalesRepController.getSalesRepsBySupplier);
+
 module.exports = router;

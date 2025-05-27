@@ -3,6 +3,61 @@ const { Order, OrderItem, Customer, Pharmacy, Medicine, Notification, User } = m
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
 
+// Search orders by ID or customer name
+exports.searchOrders = async (req, res) => {
+    const { query } = req.query;
+    try {
+        // Check if query is a number (potential order ID)
+        const isNumeric = !isNaN(query) && !isNaN(parseFloat(query));
+        
+        let searchConditions = {};
+        if (isNumeric) {
+            // If query is numeric, search by order ID
+            searchConditions = {
+                [Op.or]: [
+                    { id: query },
+                    { '$customer.name$': { [Op.like]: `%${query}%` } }
+                ]
+            };
+        } else {
+            // Otherwise search by customer name
+            searchConditions = {
+                '$customer.name$': { [Op.like]: `%${query}%` }
+            };
+        }
+        
+        const orders = await Order.findAll({
+            where: searchConditions,
+            include: [
+                {
+                    model: Customer,
+                    as: 'customer',
+                    required: true
+                },
+                {
+                    model: Pharmacy,
+                    as: 'pharmacy'
+                },
+                {
+                    model: OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: Medicine,
+                            as: 'medicine'
+                        }
+                    ]
+                }
+            ]
+        });
+        
+        res.status(200).json(orders);
+    } catch (error) {
+        console.error('Error searching orders:', error);
+        res.status(500).json({ error: 'Failed to search orders' });
+    }
+};
+
 // Get all orders
 exports.getAllOrders = async (req, res) => {
     try {

@@ -1,8 +1,66 @@
 // invoiceController.js
 
-const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier } = require('../models'); // Ensure models are imported
+const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier, Brand } = require('../models'); // Ensure models are imported
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
+
+// Helper function to handle medicine creation/update from product
+const handleMedicineFromProduct = async (product, quantity, transaction) => {
+    // Find or create brand first
+    let brand = await Brand.findOne({
+        where: { name: product.brand },
+        transaction
+    });
+
+    if (!brand) {
+        brand = await Brand.create({
+            name: product.brand,
+            description: `Auto-created brand for ${product.brand}`,
+            // Add more metadata if needed
+            created_from: 'purchase_invoice',
+            created_date: new Date()
+        }, { transaction });
+        console.log(`✅ Created new brand: ${brand.name} (auto-generated from purchase)`);
+    }
+
+    // Check if medicine exists with same name and brand_id
+    const existingMedicine = await Medicine.findOne({
+        where: {
+            name: product.name,
+            brand_id: brand.id
+        },
+        transaction,
+        lock: transaction.LOCK.UPDATE
+    });
+
+    if (existingMedicine) {
+        // Update existing medicine stock
+        const updatedMedicineQuantity = (existingMedicine.quantity || 0) + quantity;
+        await Medicine.update(
+            { 
+                quantity: updatedMedicineQuantity,
+                price: product.price, // Update price to latest purchase price
+                expiry_date: product.expiry_date || existingMedicine.expiry_date
+            },
+            { where: { id: existingMedicine.id }, transaction }
+        );
+        console.log(`✅ Updated medicine stock: ${existingMedicine.name} (+${quantity})`);
+    } else {
+        // Create new medicine from product
+        const newMedicine = await Medicine.create({
+            name: product.name,
+            brand_id: brand.id,
+            quantity: quantity,
+            price: product.price,
+            expiry_date: product.expiry_date,
+            supplier_id: product.supplier_id,
+            // Set default values for required fields
+            location_id: 1, // Default location
+            category_id: 1  // Default category
+        }, { transaction });
+        console.log(`✅ Created new medicine: ${newMedicine.name} (qty: ${quantity})`);
+    }
+};
 
 // Helper function to recalculate total amount
 const recalculateInvoiceTotal = async (invoice_id) => {
@@ -155,6 +213,7 @@ exports.createInvoice = async (req, res) => {
             const productIds = items.map(item => item.product_id);
             const products = await Product.findAll({
                 where: { id: { [Op.in]: productIds } },
+                include: [{ model: Supplier, as: 'supplier' }],
                 transaction,
                 lock: transaction.LOCK.UPDATE,
             });
@@ -189,6 +248,9 @@ exports.createInvoice = async (req, res) => {
                     { quantity: updatedQuantity },
                     { where: { id: product.id }, transaction }
                 );
+
+                // Handle medicine creation/update for purchase invoices
+                await handleMedicineFromProduct(product, item.quantity, transaction);
             }
         }
 
@@ -242,6 +304,7 @@ exports.updateInvoice = async (req, res) => {
         // Fetch all entities involved in the new items
         const entities = await entityModel.findAll({
             where: {id: {[Op.in]: entityIds}},
+            include: type === 'purchase' ? [{ model: Supplier, as: 'supplier' }] : [],
             transaction,
             lock: transaction.LOCK.UPDATE, // Lock the selected rows for update
         });
@@ -312,6 +375,11 @@ exports.updateInvoice = async (req, res) => {
                     updatedQuantity = entity.quantity - quantityDifference;
                 } else { // 'purchase'
                     updatedQuantity = entity.quantity + quantityDifference;
+                    
+                    // Handle medicine creation/update for purchase invoices (only if quantity increased)
+                    if (quantityDifference > 0) {
+                        await handleMedicineFromProduct(entity, quantityDifference, transaction);
+                    }
                 }
 
                 await entityModel.update(
@@ -337,6 +405,9 @@ exports.updateInvoice = async (req, res) => {
                     updatedQuantity = entity.quantity - newItem.quantity;
                 } else { // 'purchase'
                     updatedQuantity = entity.quantity + newItem.quantity;
+                    
+                    // Handle medicine creation/update for purchase invoices
+                    await handleMedicineFromProduct(entity, newItem.quantity, transaction);
                 }
 
                 await entityModel.update(

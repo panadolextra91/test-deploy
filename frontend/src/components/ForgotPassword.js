@@ -46,7 +46,7 @@ const ForgotPassword = () => {
                         />
                     </Form.Item>
                     <Form.Item>
-                        <Button type="primary" htmlType="submit" loading={loading} block>
+                        <Button type="primary" className="button" htmlType="submit" loading={loading} block>
                             Reset Password
                         </Button>
                     </Form.Item>

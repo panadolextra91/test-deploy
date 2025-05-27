@@ -30,7 +30,8 @@ const Brand = sequelize.define('Brand', {
     },
     imagePublicId: {
         type: DataTypes.STRING(255),
-        allowNull: true
+        allowNull: true,
+        field: 'imagePublicId'
     },
     logoUrl: {
         type: DataTypes.VIRTUAL,

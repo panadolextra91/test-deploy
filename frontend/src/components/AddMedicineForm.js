@@ -6,7 +6,7 @@ import moment from 'moment';
 //AddMedicineForm.js
 const { Option } = Select;
 
-const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, locations }) => {
+const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, locations, brands }) => {
     const [form] = Form.useForm();
     const [loading, setLoading] = useState(false);
 
@@ -29,6 +29,9 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
             formData.append('quantity', values.quantity.toString());
             formData.append('supplier_id', values.supplier_id.toString());
             formData.append('location_id', values.location_id.toString());
+            if (values.brand_id) {
+                formData.append('brand_id', values.brand_id.toString());
+            }
             formData.append('expiry_date', values.expiry_date.format('YYYY-MM-DD'));
 
             // Add the image file if it exists
@@ -92,27 +95,9 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                 layout="vertical"
                 name="add_medicine_form"
             >
-                <Form.Item
-                    name="image"
-                    label="Medicine Image"
-                    valuePropName="fileList"
-                    getValueFromEvent={(e) => {
-                        if (Array.isArray(e)) {
-                            return e;
-                        }
-                        return e?.fileList;
-                    }}
-                >
-                    <Upload 
-                        name="image"
-                        listType="picture"
-                        maxCount={1}
-                        beforeUpload={() => false}
-                        accept="image/*"
-                    >
-                        <Button icon={<UploadOutlined />}>Upload Image</Button>
-                    </Upload>
-                </Form.Item>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                    <div style={{ flex: 1 }}>
+
                 <Form.Item
                     name="name"
                     label="Name"
@@ -131,13 +116,7 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                         ))}
                     </Select>
                 </Form.Item>
-                <Form.Item
-                    name="description"
-                    label="Description"
-                    rules={[{ required: true, message: 'Please enter a description!' }]}
-                >
-                    <Input.TextArea placeholder="Enter a short description of the medicine" />
-                </Form.Item>
+
                 <Form.Item
                     name="price"
                     label="Price"
@@ -175,12 +154,55 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
                     </Select>
                 </Form.Item>
                 <Form.Item
-                    name="expiry_date"
-                    label="Expiration Date"
-                    rules={[{ required: true, message: 'Please select the expiration date!' }]}
+                    name="brand_id"
+                    label="Brand"
+                    rules={[{ required: true, message: 'Please select a brand!' }]}
                 >
-                    <DatePicker style={{ width: '100%' }} />
+                    <Select placeholder="Select brand" allowClear>
+                        {brands && brands.map((brand) => (
+                            <Option key={brand.id} value={brand.id}>{brand.name}</Option>
+                        ))}
+                    </Select>
                 </Form.Item>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <Form.Item
+                            name="image"
+                            label="Medicine Image"
+                            valuePropName="fileList"
+                            getValueFromEvent={(e) => {
+                                if (Array.isArray(e)) {
+                                    return e;
+                                }
+                                return e?.fileList;
+                            }}
+                        >
+                            <Upload 
+                                name="image"
+                                listType="picture"
+                                maxCount={1}
+                                beforeUpload={() => false}
+                                accept="image/*"
+                            >
+                                <Button icon={<UploadOutlined />}>Upload Image</Button>
+                            </Upload>
+                        </Form.Item>
+                        <Form.Item
+                            name="description"
+                            label="Description"
+                            rules={[{ required: true, message: 'Please enter a description!' }]}
+                        >
+                            <Input.TextArea placeholder="Enter a short description of the medicine" rows={4} />
+                        </Form.Item>
+                        <Form.Item
+                            name="expiry_date"
+                            label="Expiration Date"
+                            rules={[{ required: true, message: 'Please select the expiration date!' }]}
+                        >
+                            <DatePicker style={{ width: '100%' }} />
+                        </Form.Item>
+                    </div>
+                </div>
             </Form>
         </Modal>
     );

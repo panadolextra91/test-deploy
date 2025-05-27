@@ -16,12 +16,14 @@ exports.listProducts = async (req, res) => {
       include: [
         { 
           model: Supplier, 
+          as: 'supplier',
           attributes: ['id', 'name', 'contact_info'] 
         },
         {
           model: PharmaSalesRep,
+          as: 'salesRep',
           attributes: ['id', 'name', 'email'],
-          //as: 'salesRep'
+          required: false
         }
       ]
     });
@@ -38,7 +40,18 @@ exports.searchProducts = async (req, res) => {
     const q = req.query.q || '';
     const products = await Product.findAll({
       where: { name: { [Op.like]: `%${q}%` } },
-      include: [{ model: Supplier, attributes: ['id', 'name', 'contact_info'] }]
+      include: [{ 
+        model: Supplier, 
+        as: 'supplier',
+        attributes: ['id', 'name', 'contact_info'] 
+      },
+      {
+        model: PharmaSalesRep,
+        as: 'salesRep',
+        attributes: ['id', 'name', 'email'],
+        required: false
+      }
+    ]
     });
     res.json(products);
   } catch (err) {
@@ -57,6 +70,57 @@ exports.importCsv = async (req, res) => {
       skip_empty_lines: true,
       trim: true
     });
+
+    if (records.length === 0) {
+      await fs.unlink(req.file.path);
+      return res.status(400).json({ error: 'CSV file is empty' });
+    }
+
+    // Check for missing suppliers and sales reps before processing
+    const missingSuppliers = new Set();
+    const missingSalesReps = new Set();
+    
+    for (const row of records) {
+      const { supplierName, pharmaSalesRepName } = row;
+      
+      if (supplierName && supplierName.trim()) {
+        const supplier = await Supplier.findOne({ 
+          where: { name: supplierName.trim() }
+        });
+        if (!supplier) {
+          missingSuppliers.add(supplierName.trim());
+        } else if (pharmaSalesRepName && pharmaSalesRepName.trim()) {
+          const salesRep = await PharmaSalesRep.findOne({
+            where: { 
+              name: pharmaSalesRepName.trim(),
+              supplier_id: supplier.id 
+            }
+          });
+          if (!salesRep) {
+            missingSalesReps.add(`${pharmaSalesRepName.trim()} (for ${supplierName.trim()})`);
+          }
+        }
+      }
+    }
+
+    // If there are missing entities, provide guidance
+    if (missingSuppliers.size > 0 || missingSalesReps.size > 0) {
+      await fs.unlink(req.file.path);
+      return res.status(400).json({
+        error: 'Missing suppliers and/or sales representatives found in CSV',
+        missing_suppliers: Array.from(missingSuppliers),
+        missing_sales_reps: Array.from(missingSalesReps),
+        guidance: {
+          message: 'Please create the missing suppliers and sales representatives before importing, or use the external import endpoint',
+          options: [
+            'Create missing suppliers manually in the system first',
+            'Create missing sales representatives manually in the system first',
+            'Use POST /api/products/import-external for automatic creation (external sales reps only)'
+          ]
+        }
+      });
+    }
+
     let imported = 0;
     let errors = [];
 
@@ -64,28 +128,36 @@ exports.importCsv = async (req, res) => {
       try {
         const { supplierName, brand, name, price, expiry_date, pharmaSalesRepName } = row;
         
+        if (!supplierName || !brand || !name || !price || !expiry_date) {
+          errors.push(`Skipping row: missing required fields - ${JSON.stringify(row)}`);
+          continue;
+        }
+        
         // Find supplier
-        const supplier = await Supplier.findOne({ 
+        let supplier = await Supplier.findOne({ 
           where: { 
             name: supplierName.trim() 
           }
         });
+        
         if (!supplier) {
-          errors.push(`Supplier not found: ${supplierName}`);
+          errors.push(`Supplier not found: ${supplierName}. Please create this supplier first or provide supplier details.`);
           continue;
         }
 
         // Find sales rep
         let pharma_sales_rep_id = null;
-        if (pharmaSalesRepName) {
+        if (pharmaSalesRepName && pharmaSalesRepName.trim()) {
           const salesRep = await PharmaSalesRep.findOne({ 
             where: { 
               name: pharmaSalesRepName.trim(),
               supplier_id: supplier.id 
             }
           });
+          
           if (!salesRep) {
-            errors.push(`Sales rep not found: ${pharmaSalesRepName} for supplier ${supplierName}`);
+            errors.push(`Sales rep not found: ${pharmaSalesRepName} for supplier ${supplierName}. Please create this sales rep first or provide sales rep details.`);
+            // Continue without sales rep (product will still be created)
           } else {
             pharma_sales_rep_id = salesRep.id;
           }
@@ -108,7 +180,12 @@ exports.importCsv = async (req, res) => {
 
     await fs.unlink(req.file.path);
     res.json({ 
+      success: true,
       imported,
+      summary: {
+        products_imported: imported,
+        total_errors: errors.length
+      },
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (err) {
@@ -125,7 +202,13 @@ exports.emailBulkOrder = async (req, res) => {
       return res.status(400).json({ error: 'No products selected' });
     }
 
-    const user = await User.findByPk(req.user.id, { include: [{ model: Pharmacy, as: 'pharmacy' }] });
+    const user = await User.findByPk(req.user.id, { 
+      include: [{ 
+        model: Pharmacy, 
+        as: 'pharmacy',
+        attributes: ['id', 'name', 'address'] 
+      }] 
+    });
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const productIds = items.map(item => item.id);
@@ -134,15 +217,24 @@ exports.emailBulkOrder = async (req, res) => {
     const products = await Product.findAll({
       where: { id: productIds },
       include: [
-        { model: Supplier, attributes: ['id', 'name', 'contact_info'] },
-        { model: PharmaSalesRep, attributes: ['id', 'name', 'email'], as: 'salesRep' }
+        { 
+          model: Supplier, 
+          as: 'supplier',
+          attributes: ['id', 'name', 'contact_info'] 
+        },
+        { 
+          model: PharmaSalesRep, 
+          as: 'salesRep',
+          attributes: ['id', 'name', 'email'],
+          required: false
+        }
       ]
     });
 
     if (!products.length) return res.status(404).json({ error: 'No matching products found' });
 
     const bySupplier = products.reduce((map, product) => {
-      const sup = product.Supplier;
+      const sup = product.supplier; // Use the alias 'supplier' instead of 'Supplier'
       const qty = quantityMap[product.id] || 1;
       if (!map[sup.id]) map[sup.id] = { supplier: sup, items: [] };
       map[sup.id].items.push({ ...product.toJSON(), quantity: qty });
@@ -158,6 +250,8 @@ exports.emailBulkOrder = async (req, res) => {
     });
 
     const sentTo = [];
+    const emailDetails = [];
+    
     for (const { supplier, items } of Object.values(bySupplier)) {
       const listItems = items
         .map(i => `<li>
@@ -178,6 +272,16 @@ exports.emailBulkOrder = async (req, res) => {
         .filter(item => item.salesRep?.email)
         .map(item => item.salesRep.email))];
 
+      // Get unique sales rep details for response
+      const salesRepsDetails = [...new Map(items
+        .filter(item => item.salesRep)
+        .map(item => [item.salesRep.id, {
+          id: item.salesRep.id,
+          name: item.salesRep.name,
+          email: item.salesRep.email
+        }])
+      ).values()];
+
       await transporter.sendMail({
         from: process.env.SMTP_USER || 'webappanhthu@gmail.com',
         to: supplier.contact_info,
@@ -187,9 +291,39 @@ exports.emailBulkOrder = async (req, res) => {
       });
 
       sentTo.push(supplier.contact_info);
+      emailDetails.push({
+        supplier: {
+          id: supplier.id,
+          name: supplier.name,
+          email: supplier.contact_info
+        },
+        items_count: items.length,
+        total_quantity: items.reduce((sum, item) => sum + item.quantity, 0),
+        cc_emails: {
+          requester: user.email,
+          sales_reps: salesRepsDetails
+        }
+      });
     }
 
-    res.json({ success: true, emailedTo: sentTo });
+    res.json({ 
+      success: true, 
+      emailedTo: sentTo,
+      email_details: emailDetails,
+      summary: {
+        total_suppliers_contacted: emailDetails.length,
+        total_products_ordered: products.length,
+        requester: {
+          name: user.name,
+          email: user.email,
+          role: user.role
+        },
+        pharmacy: {
+          name: user.pharmacy.name,
+          address: user.pharmacy.address
+        }
+      }
+    });
   } catch (err) {
     console.error('Error sending bulk order email:', err);
     res.status(500).json({ error: 'Failed to send order email', details: err.message });
@@ -214,7 +348,18 @@ exports.filterBySupplierAndMonth = async (req, res) => {
 
     const products = await Product.findAll({
       where,
-      include: [{ model: Supplier, attributes: ['id', 'name'] }],
+      include: [{ 
+        model: Supplier, 
+        as: 'supplier',
+        attributes: ['id', 'name'] 
+      },
+      {
+        model: PharmaSalesRep,
+        as: 'salesRep',
+        attributes: ['id', 'name', 'email'],
+        required: false
+      }
+    ],
       order: [['created_at', 'DESC']]
     });
 
@@ -230,26 +375,16 @@ exports.importCsvExternal = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
   
   try {
-    // Always require pharmacy_id for all cases
-    const { pharmacy_id } = req.body;
-    if (!pharmacy_id) {
-      await fs.unlink(req.file.path);
-      return res.status(400).json({
-        error: 'Target pharmacy selection required',
-        message: 'Please select a target pharmacy to send your products to',
-        required_field: 'pharmacy_id',
-        hint: 'Use GET /api/products/pharmacies to get list of available pharmacies'
-      });
-    }
-
-    // Validate pharmacy exists early
+    // Use single pharmacy (ID = 1) approach
+    const pharmacy_id = 1;
+    
+    // Validate pharmacy exists
     const targetPharmacy = await Pharmacy.findByPk(pharmacy_id);
     if (!targetPharmacy) {
       await fs.unlink(req.file.path);
       return res.status(404).json({ 
-        error: 'Selected pharmacy not found',
-        pharmacy_id_provided: pharmacy_id,
-        message: 'Please select a valid pharmacy from the available list'
+        error: 'Pharmacy not found',
+        message: 'Default pharmacy not configured in the system'
       });
     }
 
@@ -289,11 +424,10 @@ exports.importCsvExternal = async (req, res) => {
         supplier_address,
         name, 
         email, 
-        phone,
-        pharmacy_id
+        phone
       } = req.body;
       
-      if (!supplier_name || !supplier_contact_info || !supplier_address || !name || !email || !phone || !pharmacy_id) {
+      if (!supplier_name || !supplier_contact_info || !supplier_address || !name || !email || !phone) {
         await fs.unlink(req.file.path);
         return res.status(400).json({
           error: 'Supplier not found. Please provide the following information:',
@@ -306,8 +440,7 @@ exports.importCsvExternal = async (req, res) => {
             phone: 'Your phone number'
           },
           supplier_name_from_csv: supplierName,
-          sales_rep_name_from_csv: pharmaSalesRepName,
-          note: 'Pharmacy is already validated'
+          sales_rep_name_from_csv: pharmaSalesRepName
         });
       }
 
@@ -413,9 +546,9 @@ exports.importCsvExternal = async (req, res) => {
 
     // If sales rep doesn't exist, check if additional info is provided
     if (!salesRep) {
-      const { name, email, phone, pharmacy_id } = req.body;
+      const { name, email, phone } = req.body;
       
-      if (!name || !email || !phone || !pharmacy_id) {
+      if (!name || !email || !phone) {
         await fs.unlink(req.file.path);
         return res.status(400).json({
           error: 'Sales rep not found. Please provide the following information:',
@@ -425,18 +558,7 @@ exports.importCsvExternal = async (req, res) => {
             phone: 'Your phone number'
           },
           supplier_name: supplierName,
-          sales_rep_name: pharmaSalesRepName,
-          note: 'Pharmacy is already validated'
-        });
-      }
-
-      // Validate pharmacy exists
-      const pharmacy = await Pharmacy.findByPk(pharmacy_id);
-      if (!pharmacy) {
-        await fs.unlink(req.file.path);
-        return res.status(404).json({ 
-          error: 'Pharmacy not found. Please provide a valid pharmacy_id',
-          pharmacy_id_provided: pharmacy_id
+          sales_rep_name: pharmaSalesRepName
         });
       }
 

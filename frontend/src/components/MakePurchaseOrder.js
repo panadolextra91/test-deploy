@@ -37,14 +37,14 @@ const MakePurchaseOrder = ({ visible, onCancel, products }) => {
         // Single product order
         const prod = products[0];
         response = await axios.post(
-          `${process.env.REACT_APP_BACKEND_URL}/api/products/${prod.key}/email-order`,
+          `${process.env.REACT_APP_BACKEND_URL}/api/products/${parseInt(prod.key, 10)}/email-order`,
           { quantity: quantities[prod.key] },
           { headers: { Authorization: `Bearer ${token}` } }
         );
       } else {
         // Bulk order
         const items = products.map((prod) => ({
-          id: prod.key,
+          id: parseInt(prod.key, 10), // Ensure ID is a number
           quantity: quantities[prod.key] || 1,
         }));
         response = await axios.post(
@@ -107,6 +107,7 @@ const MakePurchaseOrder = ({ visible, onCancel, products }) => {
             <List.Item>
               <span>
                 <b>{prod.brand} {prod.name}</b> (Supplier: {prod.supplier})
+                {prod.sales_rep && prod.sales_rep !== 'N/A' && <div>Sales Rep: {prod.sales_rep}</div>}
               </span>
               <Form.Item
                 style={{ margin: 0, marginLeft: 16 }}

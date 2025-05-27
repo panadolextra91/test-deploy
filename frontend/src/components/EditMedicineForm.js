@@ -7,7 +7,7 @@ import './EditMedicineForm.css';
 
 const { Option } = Select;
 
-const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, locations, categories }) => {
+const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, locations, categories, brands }) => {
     const [form] = Form.useForm();
     const [imageUrl, setImageUrl] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -17,13 +17,14 @@ const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, loca
         if (medicine) {
             form.setFieldsValue({
                 name: medicine.name,
-                category: medicine.category,
+                category_id: medicine.category_id,
                 description: medicine.description,
                 price: medicine.price,
                 quantity: medicine.quantity,
-                supplier: medicine.supplier,
-                location: medicine.location,
-                expirationDate: medicine.expiry_date ? moment(medicine.expiry_date) : null,
+                supplier_id: medicine.supplier_id,
+                location_id: medicine.location_id,
+                brand_id: medicine.brand_id,
+                expiry_date: medicine.expiry_date ? moment(medicine.expiry_date) : null,
             });
             setImageUrl(medicine.imageUrl || null);
         }
@@ -75,25 +76,17 @@ const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, loca
     const handleSubmit = async (values) => {
         setLoading(true);
         try {
-            // Find selected IDs
-            const category = categories.find(c => c.name === values.category);
-            const supplier = suppliers.find(s => s.name === values.supplier);
-            const location = locations.find(l => l.name === values.location);
-            
-            if (!category || !supplier || !location) {
-                return message.error('Invalid category, supplier, or location');
-            }
-
             // Build payload without image
             const payload = {
                 name: values.name,
-                category_id: category.id,
+                category_id: values.category_id,
                 description: values.description,
                 price: values.price,
                 quantity: values.quantity,
-                supplier_id: supplier.id,
-                location_id: location.id,
-                expiry_date: values.expirationDate.format('YYYY-MM-DD')
+                supplier_id: values.supplier_id,
+                location_id: values.location_id,
+                brand_id: values.brand_id,
+                expiry_date: values.expiry_date ? values.expiry_date.format('YYYY-MM-DD') : undefined
             };
 
             const token = sessionStorage.getItem('token');
@@ -107,11 +100,11 @@ const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, loca
             const updatedMedicine = {
                 ...response.data,
                 id: medicine.id,
-                category: values.category,
-                supplier: values.supplier,
-                location: values.location,
-                imageUrl: imageUrl,
-                expiry_date: values.expirationDate.format('YYYY-MM-DD')
+                category_id: values.category_id,
+                supplier_id: values.supplier_id,
+                location_id: values.location_id,
+                brand_id: values.brand_id,
+                imageUrl: imageUrl
             };
 
             message.success('Medicine updated successfully');
@@ -155,72 +148,83 @@ const EditMedicineForm = ({ visible, onEdit, onCancel, medicine, suppliers, loca
             onOk={() => form.validateFields().then(handleSubmit).catch(info => console.log('Validation Failed:', info))}
         >
             <Form form={form} layout="vertical" name="edit_medicine_form">
-                <div className="medicine-image-section" style={{ textAlign: 'center', marginBottom: 24 }}>
-                    {imageUrl ? (
-                        <div>
-                            <img
-                                src={imageUrl}
-                                alt="Medicine"
-                                style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
-                            />
-                            <div style={{ marginTop: '8px' }}>
-                                <Button 
-                                    type="primary" 
-                                    danger 
-                                    icon={<DeleteOutlined />} 
-                                    onClick={handleDeleteImage}
-                                    loading={loading}
-                                >
-                                    Remove Image
-                                </Button>
-                            </div>
+                <div style={{ display: 'flex', gap: '16px' }}>
+                    <div style={{ flex: 1 }}>
+                        <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Please input the name!' }]}>  
+                            <Input placeholder="Name of medicine" />
+                        </Form.Item>
+
+                        <Form.Item name="category_id" label="Category" rules={[{ required: true, message: 'Select a category!' }]}>  
+                            <Select placeholder="Category">
+                                {categories.map(c => <Option key={c.id} value={c.id}>{c.name}</Option>)}
+                            </Select>
+                        </Form.Item>
+
+                        <Form.Item name="price" label="Price" rules={[{ required: true, message: 'Enter the price!' }]}>  
+                            <Input type="number" placeholder="Price" step="0.01" />
+                        </Form.Item>
+
+                        <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Enter the quantity!' }]}>  
+                            <Input type="number" placeholder="Quantity" />
+                        </Form.Item>
+
+                        <Form.Item name="supplier_id" label="Supplier" rules={[{ required: true, message: 'Select a supplier!' }]}>  
+                            <Select placeholder="Supplier">
+                                {suppliers.map(s => <Option key={s.id} value={s.id}>{s.name}</Option>)}
+                            </Select>
+                        </Form.Item>
+
+                        <Form.Item name="location_id" label="Location" rules={[{ required: true, message: 'Select a location!' }]}>  
+                            <Select placeholder="Location">
+                                {locations.map(l => <Option key={l.id} value={l.id}>{l.name}</Option>)}
+                            </Select>
+                        </Form.Item>
+
+                        <Form.Item name="brand_id" label="Brand" rules={[{ required: true, message: 'Please select a brand!' }]}>  
+                            <Select placeholder="Brand" allowClear>
+                                {brands && brands.map(b => <Option key={b.id} value={b.id}>{b.name}</Option>)}
+                            </Select>
+                        </Form.Item>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                        <div className="medicine-image-section" style={{ textAlign: 'center', marginBottom: 24 }}>
+                            {imageUrl ? (
+                                <div>
+                                    <img
+                                        src={imageUrl}
+                                        alt="Medicine"
+                                        style={{ width: 200, height: 200, objectFit: 'cover', borderRadius: 8, marginBottom: 8 }}
+                                    />
+                                    <div style={{ marginTop: '8px' }}>
+                                        <Button 
+                                            type="primary" 
+                                            danger 
+                                            icon={<DeleteOutlined />} 
+                                            onClick={handleDeleteImage}
+                                            loading={loading}
+                                        >
+                                            Remove Image
+                                        </Button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <Upload {...uploadProps}>
+                                    <Button icon={<UploadOutlined />} loading={loading} style={{ width: 200 }}>
+                                        Upload Medicine Image
+                                    </Button>
+                                </Upload>
+                            )}
                         </div>
-                    ) : (
-                        <Upload {...uploadProps}>
-                            <Button icon={<UploadOutlined />} loading={loading} style={{ width: 200 }}>
-                                Upload Medicine Image
-                            </Button>
-                        </Upload>
-                    )}
+
+                        <Form.Item name="description" label="Description" rules={[{ required: true, message: 'Enter a description!' }]}>  
+                            <Input.TextArea placeholder="Short description" rows={4} />
+                        </Form.Item>
+
+                        <Form.Item name="expiry_date" label="Expiration Date" rules={[{ required: true, message: 'Select the expiration date!' }]}>  
+                            <DatePicker style={{ width: '100%' }} />
+                        </Form.Item>
+                    </div>
                 </div>
-
-                <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Please input the name!' }]}>  
-                    <Input placeholder="Name of medicine" />
-                </Form.Item>
-
-                <Form.Item name="category" label="Category" rules={[{ required: true, message: 'Select a category!' }]}>  
-                    <Select placeholder="Category">
-                        {categories.map(c => <Option key={c.id} value={c.name}>{c.name}</Option>)}
-                    </Select>
-                </Form.Item>
-
-                <Form.Item name="description" label="Description" rules={[{ required: true, message: 'Enter a description!' }]}>  
-                    <Input.TextArea placeholder="Short description" />
-                </Form.Item>
-
-                <Form.Item name="price" label="Price" rules={[{ required: true, message: 'Enter the price!' }]}>  
-                    <Input type="number" placeholder="Price" step="0.01" />
-                </Form.Item>
-
-                <Form.Item name="quantity" label="Quantity" rules={[{ required: true, message: 'Enter the quantity!' }]}>  
-                    <Input type="number" placeholder="Quantity" />
-                </Form.Item>
-
-                <Form.Item name="supplier" label="Supplier" rules={[{ required: true, message: 'Select a supplier!' }]}>  
-                    <Select placeholder="Supplier">
-                        {suppliers.map(s => <Option key={s.id} value={s.name}>{s.name}</Option>)}
-                    </Select>
-                </Form.Item>
-
-                <Form.Item name="location" label="Location" rules={[{ required: true, message: 'Select a location!' }]}>  
-                    <Select placeholder="Location">
-                        {locations.map(l => <Option key={l.id} value={l.name}>{l.name}</Option>)}
-                    </Select>
-                </Form.Item>
-
-                <Form.Item name="expirationDate" label="Expiration Date" rules={[{ required: true, message: 'Select the expiration date!' }]}>  
-                    <DatePicker style={{ width: '100%' }} />
-                </Form.Item>
             </Form>
         </Modal>
     );

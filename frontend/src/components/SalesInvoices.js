@@ -5,7 +5,7 @@ import {
     PlusOutlined,
     UserOutlined,
 } from "@ant-design/icons";
-import { Avatar, Button, Space, Table, Input, message } from "antd";
+import { Avatar, Button, Table, Input, message, Tag } from "antd";
 import axios from "axios";
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
@@ -145,45 +145,52 @@ const SalesInvoices = () => {
             title: "Customer Name",
             dataIndex: "customerName",
             key: "customerName",
+            align: 'center',
         },
         {
             title: "Customer Phone",
             dataIndex: "customerPhone",
             key: "customerPhone",
+            align: 'center',
         },
         {
             title: "Type",
             dataIndex: "type",
             key: "type",
+            align: 'center',
             render: (type) => type.charAt(0).toUpperCase() + type.slice(1), // Capitalize first letter
         },
         {
             title: "Total Amount",
             dataIndex: "totalAmount",
             key: "totalAmount",
-            render: (text) => `$${text.toFixed(2)}`,
+            align: 'center',
+            render: (text, record) => <Tag color={record.type === 'sale' ? 'green' : record.type === 'purchase' ? 'red' : 'blue'}>${text.toFixed(2)}</Tag>,
         },
         {
             title: "Actions",
             key: "actions",
+            align: 'center',
             render: (text, record) => (
-                <Space size="middle">
-                    <Button
-                        icon={<EditOutlined />}
-                        style={{ borderRadius: 50 }}
+                <div style={{ display: 'flex', gap: '8px', padding: '4px 0', justifyContent: 'center' }}>
+                    <Button 
+                        size="small" 
+                        icon={<EditOutlined />} 
                         onClick={() => showEditInvoiceModal(record)}
+                        style={{ minWidth: '80px', minHeight: '32px', borderRadius: '50px' }}
                     >
                         Edit
                     </Button>
-                    <Button
-                        icon={<DeleteOutlined />}
-                        style={{ borderRadius: 50 }}
-                        danger
-                        onClick={() => deleteInvoice(record.id)} // Use record.id instead of record.key
+                    <Button 
+                        size="small" 
+                        icon={<DeleteOutlined />} 
+                        danger 
+                        onClick={() => deleteInvoice(record.id)}
+                        style={{ minWidth: '80px', minHeight: '32px', borderRadius: '50px' }}
                     >
                         Delete
                     </Button>
-                </Space>
+                </div>
             ),
         },
     ];
@@ -213,25 +220,35 @@ const SalesInvoices = () => {
                     </div>
                 </header>
 
-                <section className="sales-table">
-                    <section className='table-header'>
-                        <Button
-                            type="primary"
-                            icon={<PlusOutlined />}
-                            onClick={showAddInvoiceModal}
-                            className="add-button"
-                        >
-                            Add Invoice
-                        </Button>
-                        <Search
-                            placeholder="Search by customer phone"
-                            allowClear
-                            style={{ width: 500 }}
-                            onSearch={handleSearch}
+                <div className="sales-table">
+                    <div className="table-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <Button
+                                className="add-button"
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={showAddInvoiceModal}
+                            >
+                                Add Invoice
+                            </Button>
+                            <Search
+                                className="search-bar"
+                                placeholder="Search by customer phone"
+                                allowClear
+                                onSearch={handleSearch}
+                            />
+                        </div>
+                    </div>
+                    <div className="table-container">
+                        <Table 
+                            columns={columns} 
+                            dataSource={filteredInvoices} 
+                            rowKey="id"
+                            size="small"
+                            scroll={{ x: 1200 }}
                         />
-                    </section>
-                    <Table columns={columns} dataSource={filteredInvoices} rowKey="id" /> {/* Set rowKey="id" */}
-                </section>
+                    </div>
+                </div>
 
                 <AddInvoice
                     visible={isAddModalVisible}

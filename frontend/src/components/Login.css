@@ -40,7 +40,7 @@ p {
 
 .input-group label {
     display: block;
-    font-size: 0.9rem;
+    font-size: rem;
     margin-bottom: 5px;
     color: #000000;
 }
@@ -59,6 +59,7 @@ p {
     border: 1px solid #e5e7eb; /* Border color */
     padding-left: 10px; /* Padding inside input */
     background-color: #f5f5f5;
+    
 }
 
 .ant-input-affix-wrapper input {
@@ -66,7 +67,7 @@ p {
 }
 
 .ant-input-prefix {
-    padding-right: 20px;
+    padding-right: 10px;
     color: #000000; /* Icon color */
 }
 
@@ -75,6 +76,7 @@ p {
     color: #888;
     float: right;
     font-weight: bold;
+    margin-top: 10px
 }
 
 .login-button {

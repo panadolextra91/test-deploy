@@ -5,14 +5,14 @@ import {
     DeleteOutlined,
     PlusOutlined
 } from '@ant-design/icons';
-import {Avatar, Button, Space, Table, Tag, Tooltip, message, Input} from "antd";
+import { Avatar, Button, Table, Tag, Tooltip, message, Input, Select } from "antd";
 import axios from "axios";
 import './Medicines.css';
 import AddMedicineForm from "./AddMedicineForm";
 import EditMedicineForm from "./EditMedicineForm";
 import AdminSidebar from "./AdminSidebar";
 import PharmacistSidebar from "./PharmacistSidebar";
-import moment from "moment";
+
 import {useNavigate} from "react-router-dom";
 
 const Medicines = () => {
@@ -26,6 +26,11 @@ const Medicines = () => {
     const [isAddModalVisible, setIsAddModalVisible] = useState(false);
     const [isEditModalVisible, setIsEditModalVisible] = useState(false);
     const [editingMedicine, setEditingMedicine] = useState(null);
+    // These state variables are used in the AddMedicineForm and EditMedicineForm components
+    // They are passed as props to those components
+    const [brands, setBrands] = useState([]);
+    const [selectedBrand, setSelectedBrand] = useState(undefined);
+    // Using avatarUrl state instead of userAvatarUrl for consistency
     const [loading, setLoading] = useState(true);
     const [avatarUrl, setAvatarUrl] = useState(() => {
         // Initialize from sessionStorage if available
@@ -42,15 +47,38 @@ const Medicines = () => {
         }
 
         try {
-            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/name/${value}`, {
+            // First, search for medicines by name
+            const searchResponse = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/name/${value}`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            setMedicines(response.data); // Update with multiple results
-            message.success(`Found ${response.data.length} result(s) for "${value}".`);
+            // If no results found, show message and return
+            if (!searchResponse.data || searchResponse.data.length === 0) {
+                message.info(`No medicines found for "${value}".`);
+                setMedicines([]);
+                return;
+            }
+
+            // For each found medicine, fetch its complete details
+            const detailedMedicines = await Promise.all(
+                searchResponse.data.map(async (medicine) => {
+                    try {
+                        const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines/${medicine.id}`, {
+                            headers: { Authorization: `Bearer ${token}` },
+                        });
+                        return response.data;
+                    } catch (error) {
+                        console.error(`Error fetching details for medicine ${medicine.id}:`, error);
+                        return medicine; // Return the original medicine if details fetch fails
+                    }
+                })
+            );
+
+            setMedicines(detailedMedicines);
+            message.success(`Found ${detailedMedicines.length} result(s) for "${value}".`);
         } catch (error) {
             console.error('Error searching medicines:', error);
-            message.error(`No medicines found for "${value}".`);
+            message.error(error.response?.data?.message || `Error searching for "${value}". Please try again.`);
         }
     };
 
@@ -59,7 +87,8 @@ const Medicines = () => {
         fetchCategories();
         fetchSuppliers();
         fetchLocations();
-        // Only fetch profile if avatar URL is not in sessionStorage
+        fetchBrands();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
         if (!sessionStorage.getItem('userAvatarUrl')) {
             fetchUserProfile();
         }
@@ -71,17 +100,36 @@ const Medicines = () => {
 
     const role = sessionStorage.getItem('userRole');
 
-    const fetchMedicines = async () => {
+    const fetchMedicines = async (brandId) => {
+        const token = sessionStorage.getItem('token');
         try {
-            const token = sessionStorage.getItem('token');
-            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/medicines`, {
-                headers: { Authorization: `Bearer ${token}` }
+            const url = new URL(`${process.env.REACT_APP_BACKEND_URL}/api/medicines`);
+            if (brandId) {
+                url.searchParams.append('brand_id', brandId);
+            }
+            
+            const response = await axios.get(url.toString(), {
+                headers: { Authorization: `Bearer ${token}` },
             });
             setMedicines(response.data);
         } catch (error) {
-            message.error("Failed to fetch medicines data.");
+            console.error('Error fetching medicines:', error);
+            message.error('Failed to load medicines');
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchBrands = async () => {
+        try {
+            const token = sessionStorage.getItem('token');
+            const response = await axios.get(`${process.env.REACT_APP_BACKEND_URL}/api/brands`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setBrands(response.data);
+        } catch (error) {
+            console.error('Error fetching brands:', error);
+            message.error('Failed to load brands');
         }
     };
 
@@ -158,13 +206,16 @@ const Medicines = () => {
             const category = categories.find(cat => cat.id === newMedicine.category_id);
             const supplier = suppliers.find(sup => sup.id === newMedicine.supplier_id);
             const location = locations.find(loc => loc.id === newMedicine.location_id);
+            const brand = brands.find(b => b.id === newMedicine.brand_id);
 
             // Format the medicine data with names instead of IDs
             const formattedMedicine = {
                 ...newMedicine,
                 category: category ? category.name : 'N/A',
                 supplier: supplier ? supplier.name : 'N/A',
-                location: location ? location.name : 'N/A'
+                location: location ? location.name : 'N/A',
+                brand: brand ? brand.name : 'N/A',
+                brand_manufacturer: brand ? brand.manufacturer || '' : ''
             };
 
             setMedicines([...medicines, formattedMedicine]);
@@ -177,9 +228,25 @@ const Medicines = () => {
 
     const handleEditMedicine = async (updatedMedicine) => {
         try {
+            // Find the names for the IDs
+            const category = categories.find(cat => cat.id === updatedMedicine.category_id);
+            const supplier = suppliers.find(sup => sup.id === updatedMedicine.supplier_id);
+            const location = locations.find(loc => loc.id === updatedMedicine.location_id);
+            const brand = brands.find(b => b.id === updatedMedicine.brand_id);
+
+            // Format the medicine data with names instead of IDs
+            const formattedMedicine = {
+                ...updatedMedicine,
+                category: category ? category.name : 'N/A',
+                supplier: supplier ? supplier.name : 'N/A',
+                location: location ? location.name : 'N/A',
+                brand: brand ? brand.name : 'N/A',
+                brand_manufacturer: brand ? brand.manufacturer || '' : ''
+            };
+
             // Update the local state with the updated medicine data
             const updatedMedicines = medicines.map(med =>
-                med.id === updatedMedicine.id ? updatedMedicine : med
+                med.id === updatedMedicine.id ? formattedMedicine : med
             );
             setMedicines(updatedMedicines);
             setIsEditModalVisible(false);
@@ -211,7 +278,9 @@ const Medicines = () => {
         {
             title: 'Image',
             key: 'image',
-            width: 100,
+            align: 'center',
+            width: 90,
+            fixed: 'left',
             render: (record) => (
                 <div style={{ display: 'flex', justifyContent: 'center' }}>
                     {record.imageUrl ? (
@@ -219,10 +288,9 @@ const Medicines = () => {
                             src={record.imageUrl}
                             alt={record.name}
                             style={{
-                                width: '50px',
-                                height: '50px',
-                                objectFit: 'cover',
-                                borderRadius: '4px'
+                                width: '80px',
+                                height: '80px',
+                                objectFit: 'contain',
                             }}
                         />
                     ) : (
@@ -234,7 +302,6 @@ const Medicines = () => {
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                borderRadius: '4px'
                             }}
                         >
                             No Image
@@ -244,9 +311,11 @@ const Medicines = () => {
             )
         },
         {
-            title: 'Medicine Name',
+            title: 'Name',
             dataIndex: 'name',
             key: 'name',
+            align: 'center',
+            width: 150,
             render: (text) => (
                 <Tooltip title={text}>
                     <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{text}</span>
@@ -254,20 +323,48 @@ const Medicines = () => {
             ),
         },
         {
+            title: 'Brand',
+            dataIndex: 'brand',
+            key: 'brand',
+            width: 120,
+            align: 'center',
+            render: (brand, record) => (
+                <Tooltip title={record.brand_manufacturer ? `${brand} (${record.brand_manufacturer})` : brand}>
+                    <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                        {brand || 'N/A'}
+                    </span>
+                </Tooltip>
+            ),
+        },
+        {
             title: 'Price',
             dataIndex: 'price',
             key: 'price',
-            render: (price) => `$${parseFloat(price).toFixed(2)}`
+            width: 70,
+            align: 'center',
+            render: (price) => (
+                <div style={{ textAlign: 'center', paddingRight: '12px' }}>
+                    ${parseFloat(price).toFixed(2)}
+                </div>
+            )
         },
         {
             title: 'Stock',
             dataIndex: 'quantity',
             key: 'quantity',
-            render: (quantity) => quantity
+            width: 80,
+            align: 'center',
+            render: (quantity) => (
+                <div style={{ textAlign: 'center' }}>
+                    {quantity}
+                </div>
+            )
         },
         {
-            title: 'Stock Status',
+            title: 'Status',
             key: 'stockStatus',
+            width: 100,
+            align: 'center',
             render: (text, record) => (
                 <Tag color={record.quantity <= 0 ? 'gray' : record.quantity < LOW_STOCK_THRESHOLD ? 'red' : 'green'}>
                     {record.quantity <= 0 ? 'Out of Stock' : record.quantity < LOW_STOCK_THRESHOLD ? 'Low Stock' : 'In Stock'}
@@ -275,11 +372,13 @@ const Medicines = () => {
             )
         },
         {
-            title: 'Expiration Date',
+            title: 'Expiry',
             dataIndex: 'expiry_date',
             key: 'expiry_date',
+            width: 100,
+            align: 'center',
             render: (date) => {
-                const formattedDate = new Date(date).toLocaleDateString();
+                const formattedDate = <Tag color="blue">{new Date(date).toLocaleDateString()}</Tag>;
                 return isNaN(new Date(date).getTime()) ? 'Invalid Date' : formattedDate;
             }
         },
@@ -287,28 +386,78 @@ const Medicines = () => {
             title: 'Supplier',
             dataIndex: 'supplier',
             key: 'supplier',
-            render: (supplier) => supplier || 'N/A'
+            width: 120,
+            align: 'center',
+            render: (supplier) => (
+                <Tooltip title={supplier}>
+                    <div style={{ 
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis',
+                        textAlign: 'center'
+                    }}>
+                        {supplier || 'N/A'}
+                    </div>
+                </Tooltip>
+            )
         },
         {
             title: 'Location',
             dataIndex: 'location',
             key: 'location',
-            render: (location) => location || 'N/A'
+            width: 90,
+            align: 'center',
+            render: (location) => (
+                <div style={{ textAlign: 'center' }}>
+                    {location || 'N/A'}
+                </div>
+            )
         },
         {
             title: 'Category',
             dataIndex: 'category',
             key: 'category',
-            render: (category) => category || 'N/A'
+            width: 120,
+            align: 'center',
+            render: (category) => (
+                <Tooltip title={category}>
+                    <div style={{ 
+                        whiteSpace: 'nowrap', 
+                        overflow: 'hidden', 
+                        textOverflow: 'ellipsis',
+                        textAlign: 'center'
+                    }}>
+                        {category || 'N/A'}
+                    </div>
+                </Tooltip>
+            )
         },
         {
             title: 'Actions',
             key: 'actions',
+            fixed: 'right',
+            width: 150,
+            align: 'center',
             render: (text, record) => (
-                <Space size="middle">
-                    <Button icon={<EditOutlined />} style={{ borderRadius: 50 }} onClick={() => showEditMedicineModal(record)}>Edit</Button>
-                    <Button icon={<DeleteOutlined />} style={{ borderRadius: 50 }} danger onClick={() => deleteMedicine(record.id)}>Delete</Button>
-                </Space>
+                <div style={{ display: 'flex', gap: '8px', padding: '4px 0' }}>
+                    <Button 
+                        size="small" 
+                        icon={<EditOutlined />} 
+                        onClick={() => showEditMedicineModal(record)}
+                        style={{ minWidth: '80px', minHeight: '32px', borderRadius: '50px' }}
+                    >
+                        Edit
+                    </Button>
+                    <Button 
+                        size="small" 
+                        icon={<DeleteOutlined />} 
+                        danger 
+                        onClick={() => deleteMedicine(record.id)}
+                        style={{ minWidth: '80px', minHeight: '32px', borderRadius: '50px' }}
+                    >
+                        Delete
+                    </Button>
+                </div>
             )
         }
     ];
@@ -325,43 +474,79 @@ const Medicines = () => {
                     </div>
                     <div className='header-right'>
                         <div onClick={handleAvatarClick} style={{cursor: 'pointer'}}>
-                        <Avatar 
-                            size={50} 
-                            icon={!avatarUrl && <UserOutlined />}
-                            src={avatarUrl}
-                            onError={() => {
-                                setAvatarUrl(null);
-                                sessionStorage.removeItem('userAvatarUrl');
-                            }}
-                        />
+                            <Avatar 
+                                size={50} 
+                                icon={!avatarUrl && <UserOutlined />}
+                                src={avatarUrl}
+                                onError={() => {
+                                    setAvatarUrl(null);
+                                    sessionStorage.removeItem('userAvatarUrl');
+                                }}
+                            />
                         </div>
                     </div>
                 </header>
 
-                <section className="medicines-table">
-                    <section className="table-header">
-                        <Button
-                            className="add-button"
-                            type="primary"
-                            icon={<PlusOutlined/>}
-                            onClick={showAddMedicineModal}
-                        >
-                            Add Medicine
-                        </Button>
-                        <Search
-                            placeholder="Search medicines..."
-                            allowClear
-                            onSearch={onSearch}
-                            style={{ width: 500}}
+                <div className="medicines-table">
+                    <div className="table-header">
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+                            <Button
+                                className="add-button"
+                                type="primary"
+                                icon={<PlusOutlined />}
+                                onClick={showAddMedicineModal}
+                            >
+                                Add Medicine
+                            </Button>
+                            
+                            <Select
+                                className="brand-filter"
+                                showSearch
+                                placeholder="Filter by brand"
+                                optionFilterProp="children"
+                                onChange={(value) => {
+                                    setSelectedBrand(value);
+                                    fetchMedicines(value);
+                                }}
+                                onClear={() => {
+                                    setSelectedBrand(undefined);
+                                    fetchMedicines();
+                                }}
+                                allowClear
+                                value={selectedBrand}
+                                filterOption={(input, option) =>
+                                    option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                                }
+                            >
+                                {brands.map(brand => (
+                                    <Select.Option key={brand.id} value={brand.id}>
+                                        {brand.name}
+                                    </Select.Option>
+                                ))}
+                            </Select>
+                            <Search
+                                className="search-bar"
+                                placeholder="Search medicines..."
+                                allowClear
+                                onSearch={onSearch}
+                            />
+                        </div>
+                    </div>
+                    <div className="table-container">
+                        <Table
+                            columns={columns}
+                            dataSource={medicines}
+                            loading={loading}
+                            scroll={{ x: 1500 }}
+                            size="small"
+                            rowKey="id"
                         />
-
-                    </section>
-                    <Table columns={columns} dataSource={medicines} loading={loading}/>
-                </section>
+                    </div>
+                </div>
                 <AddMedicineForm visible={isAddModalVisible} onCreate={handleAddMedicine} onCancel={handleCancel}
-                                 categories={categories} suppliers={suppliers} locations={locations}/>
+                                 categories={categories} suppliers={suppliers} locations={locations} brands={brands}/>
                 <EditMedicineForm visible={isEditModalVisible} onEdit={handleEditMedicine} onCancel={handleCancel}
-                                  medicine={editingMedicine} suppliers={suppliers} locations={locations} categories={categories}/>
+                                  medicine={editingMedicine} suppliers={suppliers} locations={locations} categories={categories} brands={brands}/>
             </main>
         </div>
     );

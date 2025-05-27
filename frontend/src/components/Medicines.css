@@ -14,10 +14,66 @@
 
 .table-header {
     display: flex;
-    align-items: center; /* Vertically align items */
-    justify-content: space-between; /* Push items to ends of the row */
+    align-items: center;
+    justify-content: flex-start;
+    margin-bottom: 16px;
+    width: 100%;
 }
 
 .add-button {
     border-radius: 50px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.search-bar {
+    width: 300px;
+}
+
+.brand-filter {
+    width: 200px;
+}
+
+.search-bar .ant-input-search-button,
+.brand-filter .ant-select-selector {
+    border-radius: 4px;
+}
+
+.table-container {
+    width: 100%;
+    overflow-x: auto;
+    margin-top: 16px;
+    /*border: 1px solid #f0f0f0;
+    border-radius: 8px;*/
+}
+
+/* Make sure the table takes full width of its container */
+.table-container .ant-table {
+    min-width: 100%;
+}
+
+/* Style for the table header */
+.table-container .ant-table-thead > tr > th {
+    background: #fafafa;
+    font-weight: 600;
+}
+
+/* Style for table rows */
+.table-container .ant-table-tbody > tr > td {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Style for the fixed columns */
+.table-container .ant-table-fixed {
+    box-shadow: 6px 0 6px -4px rgba(0, 0, 0, 0.15);
+}
+
+/* Make sure the table is responsive */
+@media (max-width: 1200px) {
+    .table-container {
+        width: calc(100vw - 300px);
+    }
 }

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Form, Input, Button, Table, Select, InputNumber, message } from 'antd';
+import { Modal, Form, Input, Button, Table, Select, InputNumber, message, Tooltip } from 'antd';
 import axios from 'axios';
 import debounce from 'lodash.debounce';
 
@@ -129,19 +129,26 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
                 return;
             }
             if (existingItem) {
-                setItems(items.map(item =>
-                    item.medicine_id === selectedMedicine.id
-                        ? { ...item, quantity: item.quantity + itemQuantity, total: (item.quantity + itemQuantity) * item.price }
-                        : item
-                ));
+                setItems(items.map(item => {
+                    if (item.medicine_id === selectedMedicine.id) {
+                        const price = parseFloat(item.price) || 0;
+                        return { 
+                            ...item, 
+                            quantity: item.quantity + itemQuantity, 
+                            total: (item.quantity + itemQuantity) * price 
+                        };
+                    }
+                    return item;
+                }));
             } else {
+                const price = parseFloat(selectedMedicine.price) || 0;
                 setItems([...items, {
                     key: selectedMedicine.id,
                     medicine_id: selectedMedicine.id,
                     name: selectedMedicine.name,
                     quantity: itemQuantity,
-                    price: selectedMedicine.price,
-                    total: itemQuantity * selectedMedicine.price,
+                    price: price,
+                    total: itemQuantity * price,
                     available_quantity: availableQuantity,
                     toDelete: false,
                 }]);
@@ -159,19 +166,28 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
                 return;
             }
             if (existingItem) {
-                setItems(items.map(item =>
-                    item.product_id === selectedProduct.id
-                        ? { ...item, quantity: item.quantity + itemQuantity, total: (item.quantity + itemQuantity) * item.price }
-                        : item
-                ));
+                setItems(items.map(item => {
+                    if (item.product_id === selectedProduct.id) {
+                        const price = parseFloat(item.price) || 0;
+                        return { 
+                            ...item, 
+                            quantity: item.quantity + itemQuantity, 
+                            total: (item.quantity + itemQuantity) * price 
+                        };
+                    }
+                    return item;
+                }));
             } else {
+                const price = parseFloat(selectedProduct.price) || 0;
                 setItems([...items, {
                     key: selectedProduct.id,
                     product_id: selectedProduct.id,
                     name: selectedProduct.name,
+                    brand: selectedProduct.brand,
+                    supplier: selectedProduct.supplier ? selectedProduct.supplier.name : '',
                     quantity: itemQuantity,
-                    price: selectedProduct.price,
-                    total: itemQuantity * selectedProduct.price,
+                    price: price,
+                    total: itemQuantity * price,
                     available_quantity: availableQuantity,
                     toDelete: false,
                 }]);
@@ -185,45 +201,73 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
         if (quantity < 0) {
             return;
         }
-        setItems(items.map(item =>
-            item.key === key
-                ? { ...item, quantity, total: quantity * item.price }
-                : item
-        ));
+        setItems(items.map(item => {
+            if (item.key === key) {
+                const price = parseFloat(item.price) || 0;
+                return { 
+                    ...item, 
+                    quantity, 
+                    total: quantity * price 
+                };
+            }
+            return item;
+        }));
     };
 
     const handleSave = async () => {
         try {
             const values = await form.validateFields();
             const token = sessionStorage.getItem("token");
+            
+            // Validate items
+            if (!items.length) {
+                message.error('Please add at least one item to the invoice.');
+                return;
+            }
+            
+            // Format items for the backend
             let itemsPayload = [];
             if (invoiceType === 'sale') {
                 itemsPayload = items.map(item => ({
+                    id: item.id, // Include if it's an existing item
                     medicine_id: item.medicine_id,
                     quantity: item.quantity,
-                    toDelete: item.toDelete,
+                    price: item.price,
+                    toDelete: item.toDelete || false
                 }));
             } else {
                 itemsPayload = items.map(item => ({
+                    id: item.id, // Include if it's an existing item
                     product_id: item.product_id,
                     quantity: item.quantity,
-                    toDelete: item.toDelete,
+                    price: item.price,
+                    toDelete: item.toDelete || false
                 }));
             }
+            
+            // Calculate total amount
+            const totalAmount = items
+                .filter(item => !item.toDelete)
+                .reduce((sum, item) => sum + item.total, 0);
+            
             const payload = {
                 invoice_date: new Date().toISOString(),
-                type: values.status,
+                type: values.status || invoiceType,
                 customer_id: customerPhone,
                 items: itemsPayload,
+                total_amount: totalAmount
             };
+            
             const response = await axios.put(`${process.env.REACT_APP_BACKEND_URL}/api/invoices/${invoice.id}`, payload, {
                 headers: { Authorization: `Bearer ${token}` },
             });
+            
             message.success("Invoice updated successfully!");
             onEdit(response.data);
             handleCancel();
         } catch (error) {
-            message.error("Failed to update invoice.");
+            console.error('Error updating invoice:', error);
+            message.error(error.response?.data?.error || "Failed to update invoice.");
         }
     };
 
@@ -293,13 +337,13 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
             title: "Price",
             dataIndex: "price",
             key: "price",
-            render: (price) => `$${price.toFixed(2)}`,
+            render: (price) => `$${parseFloat(price).toFixed(2)}`,
         },
         {
             title: "Total",
             dataIndex: "total",
             key: "total",
-            render: (total) => `$${total.toFixed(2)}`,
+            render: (total) => `$${parseFloat(total).toFixed(2)}`,
         },
     ];
 
@@ -308,6 +352,7 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
             visible={visible}
             title="Edit Invoice"
             onCancel={handleCancel}
+            width={700}
             footer={[
                 <Button key="cancel" onClick={handleCancel}>
                     Cancel
@@ -343,9 +388,26 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
                             placeholder="Select a medicine"
                             value={selectedMedicine?.id || null}
                             onChange={(value) => setSelectedMedicine(medicines.find(m => m.id === value))}
+                            style={{ width: '300px' }}
+                            showSearch
+                            optionFilterProp="children"
+                            filterOption={(input, option) => 
+                                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                            }
                         >
                             {medicines.map(med => (
-                                <Option key={med.id} value={med.id}>{med.name}</Option>
+                                <Option key={med.id} value={med.id}>
+                                    <Tooltip title={
+                                        <div>
+                                            <p><strong>Brand:</strong> {med.brand || 'N/A'}</p>
+                                            <p><strong>Available Stock:</strong> {med.quantity}</p>
+                                            <p><strong>Price:</strong> ${parseFloat(med.price).toFixed(2)}</p>
+                                            {med.expiry_date && <p><strong>Expiry:</strong> {new Date(med.expiry_date).toLocaleDateString()}</p>}
+                                        </div>
+                                    }>
+                                        {med.name} {med.quantity <= 0 ? "(Out of stock)" : ""}
+                                    </Tooltip>
+                                </Option>
                             ))}
                         </Select>
                     ) : (
@@ -353,9 +415,26 @@ const EditInvoice = ({ visible, onEdit, onCancel, invoice }) => {
                             placeholder="Select a product"
                             value={selectedProduct?.id || null}
                             onChange={(value) => setSelectedProduct(products.find(p => p.id === value))}
+                            style={{ width: '300px' }}
+                            showSearch
+                            optionFilterProp="children"
+                            filterOption={(input, option) => 
+                                option.children.toLowerCase().indexOf(input.toLowerCase()) >= 0
+                            }
                         >
                             {products.map(prod => (
-                                <Option key={prod.id} value={prod.id}>{prod.name}</Option>
+                                <Option key={prod.id} value={prod.id}>
+                                    <Tooltip title={
+                                        <div>
+                                            <p><strong>Brand:</strong> {prod.brand || 'N/A'}</p>
+                                            <p><strong>Supplier:</strong> {prod.supplier ? prod.supplier.name : 'N/A'}</p>
+                                            <p><strong>Price:</strong> ${parseFloat(prod.price).toFixed(2)}</p>
+                                            <p><strong>Available Stock:</strong> {prod.quantity || 0}</p>
+                                        </div>
+                                    }>
+                                        {prod.name}
+                                    </Tooltip>
+                                </Option>
                             ))}
                         </Select>
                     )}

@@ -1,13 +1,18 @@
-import React from "react";
-import { Modal, Form, Input, Select } from "antd";
+import React, { useEffect } from "react";
+import { Modal, Form, Input, Select, message } from "antd";
 
 const EditUserForm = ({ visible, onEdit, onCancel, initialValues }) => {
     const [form] = Form.useForm();
 
     // Set initial form values when the component is rendered
-    React.useEffect(() => {
+    useEffect(() => {
         if (initialValues) {
-            form.setFieldsValue(initialValues);
+            form.setFieldsValue({
+                username: initialValues.username,
+                name: initialValues.name,
+                email: initialValues.email,
+                role: initialValues.role
+            });
         }
     }, [initialValues, form]);
 
@@ -29,6 +34,13 @@ const EditUserForm = ({ visible, onEdit, onCancel, initialValues }) => {
             }}
         >
             <Form form={form} layout="vertical">
+                <Form.Item
+                    name="username"
+                    label="Username"
+                    rules={[{ required: true, message: "Please enter the username" }]}
+                >
+                    <Input />
+                </Form.Item>
                 <Form.Item
                     name="name"
                     label="Name"

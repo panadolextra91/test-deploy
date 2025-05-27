@@ -3,9 +3,9 @@ import {
     UserOutlined,
     EditOutlined,
 } from '@ant-design/icons';
-import { Avatar, Button, Space, Table, message } from "antd";
+import { Avatar, Button, Table, message } from "antd";
 import axios from "axios";
-import './Categories.css';
+import './Medicines.css';
 import EditCategoryForm from "./EditCategoryForm";
 import PharmacistSidebar from "./PharmacistSidebar";
 import AdminSidebar from "./AdminSidebar";
@@ -134,26 +134,36 @@ const Categories = () => {
         {
             title: 'Category',
             dataIndex: 'category',
-            key: 'category'
+            key: 'category',
+            align: 'center'
         },
         {
             title: 'Description',
             dataIndex: 'des',
-            key: 'des'
+            key: 'des',
+            align: 'center'
         },
         {
             title: 'Actions',
             key: 'actions',
+            align: 'center',
             render: (text, record) => (
-                <Space size="middle">
-                    <Button icon={<EditOutlined />} style={{ borderRadius: 50 }} onClick={() => showEditCategoryModal(record.key)}>Edit</Button>
-                </Space>
+                <div style={{ display: 'flex', gap: '8px', padding: '4px 0', justifyContent: 'center' }}>
+                    <Button 
+                        size="small" 
+                        icon={<EditOutlined />} 
+                        onClick={() => showEditCategoryModal(record.key)}
+                        style={{ minWidth: '80px', minHeight: '32px', borderRadius: '50px' }}
+                    >
+                        Edit
+                    </Button>
+                </div>
             )
         }
     ];
 
     return (
-        <div className="categories-container">
+        <div className="medicines-container">
             {/* Sidebar Navigation */}
             {userRole === 'admin' ? <AdminSidebar /> : <PharmacistSidebar />}
 
@@ -178,9 +188,16 @@ const Categories = () => {
                         </div>
                     </div>
                 </header>
-                <section className="categories-table">
-                    <Table columns={columns} dataSource={categories} />
-                </section>
+                <div className="medicines-table">
+                    <div className="table-container">
+                        <Table 
+                            columns={columns} 
+                            dataSource={categories} 
+                            size="small"
+                            scroll={{ x: 1000 }}
+                        />
+                    </div>
+                </div>
                 <EditCategoryForm
                     visible={isEditModalVisible}
                     onEdit={handleEditCategory}
