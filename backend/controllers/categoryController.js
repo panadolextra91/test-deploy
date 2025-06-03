@@ -1,12 +1,24 @@
 //categoryController.js
 const Category = require('../models/Category');
-
+const sequelize = require('../config/database');
+const { Op } = require('sequelize');
 // Get all categories
 exports.getAllCategories = async (req, res) => {
     try {
-        const categories = await Category.findAll();
+        const categories = await Category.findAll({
+            attributes: [
+                'id',
+                'name',
+                'description',
+                [
+                    sequelize.literal('(SELECT COUNT(*) FROM medicines WHERE medicines.category_id = Category.id)'),
+                    'medicineCount'
+                ]
+            ]
+        });
         res.status(200).json(categories);
     } catch (error) {
+        console.error('Error fetching categories:', error);
         res.status(500).json({ error: 'Failed to retrieve categories' });
     }
 };

@@ -126,6 +126,124 @@ exports.getOrderById = async (req, res) => {
     }
 };
 
+// Get all orders for a specific customer
+exports.getOrdersByCustomer = async (req, res) => {
+    const { customer_id } = req.params;
+    try {
+        // Verify customer exists
+        const customer = await Customer.findByPk(customer_id);
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        const orders = await Order.findAll({
+            where: { customer_id: parseInt(customer_id) },
+            include: [
+                {
+                    model: Customer,
+                    as: 'customer'
+                },
+                {
+                    model: Pharmacy,
+                    as: 'pharmacy'
+                },
+                {
+                    model: OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: Medicine,
+                            as: 'medicine'
+                        }
+                    ]
+                }
+            ],
+            order: [['created_at', 'DESC']] // Most recent orders first
+        });
+        
+        res.status(200).json({
+            customer: {
+                id: customer.id,
+                name: customer.name,
+                phone: customer.phone,
+                email: customer.email
+            },
+            orders: orders,
+            total_orders: orders.length
+        });
+    } catch (error) {
+        console.error('Error fetching customer orders:', error);
+        res.status(500).json({ error: 'Failed to retrieve customer orders' });
+    }
+};
+
+// Filter orders for a specific customer by status
+exports.getOrdersByCustomerAndStatus = async (req, res) => {
+    const { customer_id, status } = req.params;
+    try {
+        // Validate status
+        const validStatuses = ['pending', 'approved', 'denied', 'completed'];
+        if (!validStatuses.includes(status)) {
+            return res.status(400).json({ 
+                error: 'Invalid status',
+                valid_statuses: validStatuses
+            });
+        }
+
+        // Verify customer exists
+        const customer = await Customer.findByPk(customer_id);
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        const orders = await Order.findAll({
+            where: { 
+                customer_id: parseInt(customer_id),
+                status: status
+            },
+            include: [
+                {
+                    model: Customer,
+                    as: 'customer'
+                },
+                {
+                    model: Pharmacy,
+                    as: 'pharmacy'
+                },
+                {
+                    model: OrderItem,
+                    as: 'items',
+                    include: [
+                        {
+                            model: Medicine,
+                            as: 'medicine'
+                        }
+                    ]
+                }
+            ],
+            order: [['created_at', 'DESC']] // Most recent orders first
+        });
+        
+        res.status(200).json({
+            customer: {
+                id: customer.id,
+                name: customer.name,
+                phone: customer.phone,
+                email: customer.email
+            },
+            filter: {
+                status: status,
+                applied: true
+            },
+            orders: orders,
+            total_orders: orders.length
+        });
+    } catch (error) {
+        console.error('Error fetching customer orders by status:', error);
+        res.status(500).json({ error: 'Failed to retrieve customer orders by status' });
+    }
+};
+
 // Create new order
 exports.createOrder = async (req, res) => {
     const { customer_id, pharmacy_id, items, shipping_address, note } = req.body;

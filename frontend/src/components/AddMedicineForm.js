@@ -89,6 +89,7 @@ const AddMedicineForm = ({ visible, onCreate, onCancel, categories, suppliers, l
             onOk={handleAdd}
             confirmLoading={loading}
             okButtonProps={{ loading }}
+            width={650}
         >
             <Form
                 form={form}

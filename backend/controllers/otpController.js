@@ -53,6 +53,42 @@ const sendOTP = async (email, otp) => {
   }
 };
 
+// Check if phone number is verified
+exports.checkPhoneStatus = async (req, res) => {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Check if customer exists
+    const customer = await Customer.findOne({ 
+      where: { phone } 
+    });
+
+    if (!customer) {
+      return res.json({
+        exists: false,
+        verified: false,
+        hasPassword: false,
+        message: 'Phone number not registered'
+      });
+    }
+
+    res.json({
+      exists: true,
+      verified: customer.verified,
+      hasPassword: !!customer.password,
+      hasEmail: !!customer.email,
+      message: customer.verified ? 'Phone number is verified' : 'Phone number exists but not verified'
+    });
+  } catch (error) {
+    console.error('Error in checkPhoneStatus:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 // Request OTP for customer login
 exports.requestOTP = async (req, res) => {
   try {
@@ -68,23 +104,24 @@ exports.requestOTP = async (req, res) => {
     });
     
     if (!customer) {
-      return res.status(404).json({ 
-        error: 'Customer not found' 
-      });
-    }
-
-    // If customer exists but has no email, check if email was provided in the request
-    if (!customer.email) {
+      // Customer doesn't exist - auto-register
       if (!email) {
         return res.status(400).json({ 
-          error: 'Email is required for this account',
-          requiresEmail: true
+          error: 'Email is required for new customer registration',
+          requiresEmail: true,
+          isNewCustomer: true
         });
       }
-      
-      // Update customer with the provided email
+
       try {
-        customer = await customer.update({ email });
+        // Create new customer with phone as name
+        customer = await Customer.create({
+          name: phone, // Use phone as name
+          phone: phone,
+          email: email,
+          verified: false
+        });
+        console.log(`New customer auto-registered: ${phone}`);
       } catch (error) {
         if (error.name === 'SequelizeUniqueConstraintError') {
           return res.status(400).json({ 
@@ -92,6 +129,29 @@ exports.requestOTP = async (req, res) => {
           });
         }
         throw error;
+      }
+    } else {
+      // Customer exists but has no email
+      if (!customer.email) {
+        if (!email) {
+          return res.status(400).json({ 
+            error: 'Email is required for this account',
+            requiresEmail: true,
+            isNewCustomer: false
+          });
+        }
+        
+        // Update existing customer with the provided email
+        try {
+          customer = await customer.update({ email });
+        } catch (error) {
+          if (error.name === 'SequelizeUniqueConstraintError') {
+            return res.status(400).json({ 
+              error: 'Email is already registered with another account' 
+            });
+          }
+          throw error;
+        }
       }
     }
 
@@ -124,10 +184,11 @@ exports.requestOTP = async (req, res) => {
 
     res.json({ 
       success: true, 
-      message: `OTP sent to your registered email: ${customer.email}`,
+      message: `OTP sent to your email: ${customer.email}`,
       expires_at,
       email: customer.email,
-      emailSent: true
+      emailSent: true,
+      isNewCustomer: !customer.verified && !customer.password
     });
   } catch (error) {
     console.error('Error in requestOTP:', error);
@@ -173,16 +234,8 @@ exports.verifyOTP = async (req, res) => {
       return res.status(404).json({ error: 'Customer not found' });
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      { id: customer.id, phone: customer.phone },
-      process.env.JWT_SECRET,
-      { expiresIn: '7d' }
-    );
-
     res.json({
       success: true,
-      token,
       customer: {
         id: customer.id,
         name: customer.name,

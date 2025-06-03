@@ -80,7 +80,8 @@ const Categories = () => {
             const fetchedCategories = response.data.map(category => ({
                 key: category.id,
                 category: category.name,
-                des: category.description
+                des: category.description,
+                medicineCount: category.medicineCount
             }));
             setCategories(fetchedCategories);
         } catch (error) {
@@ -235,6 +236,7 @@ const Categories = () => {
     const columns = [
         { title: 'Category', dataIndex: 'category', key: 'category', align: 'center' },
         { title: 'Description', dataIndex: 'des', key: 'des', align: 'center' },
+        { title: 'Medicine Count', dataIndex: 'medicineCount', key: 'medicineCount', align: 'center' },
         {
             title: 'Actions', key: 'actions', align: 'center', render: (text, record) => (
                 <div style={{ display: 'flex', gap: '8px', padding: '4px 0', justifyContent: 'center' }}>

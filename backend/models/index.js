@@ -18,6 +18,11 @@ const HealthRecord = require('./HealthRecord');
 const HealthMetricsHistory = require('./HealthMetricsHistory');
 const Allergy = require('./Allergy');
 const News = require('./News');
+const Schedule = require('./Schedule');
+const ScheduleNotification = require('./ScheduleNotification');
+const ScheduleLog = require('./ScheduleLog');
+const Cart = require('./Cart');
+const CartItem = require('./CartItem');
 
 //index.js
 // Define associations here after all models are loaded
@@ -186,6 +191,98 @@ Allergy.belongsTo(Customer, {
     as: 'customer'
 });
 
+// Schedule-related associations
+Customer.hasMany(Schedule, {
+    foreignKey: 'customer_id',
+    as: 'schedules'
+});
+
+Schedule.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Schedule.hasMany(ScheduleNotification, {
+    foreignKey: 'schedule_id',
+    as: 'notifications'
+});
+
+ScheduleNotification.belongsTo(Schedule, {
+    foreignKey: 'schedule_id',
+    as: 'schedule'
+});
+
+ScheduleNotification.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Customer.hasMany(ScheduleNotification, {
+    foreignKey: 'customer_id',
+    as: 'scheduleNotifications'
+});
+
+Schedule.hasMany(ScheduleLog, {
+    foreignKey: 'schedule_id',
+    as: 'logs'
+});
+
+ScheduleLog.belongsTo(Schedule, {
+    foreignKey: 'schedule_id',
+    as: 'schedule'
+});
+
+ScheduleNotification.hasMany(ScheduleLog, {
+    foreignKey: 'schedule_notification_id',
+    as: 'logs'
+});
+
+ScheduleLog.belongsTo(ScheduleNotification, {
+    foreignKey: 'schedule_notification_id',
+    as: 'notification'
+});
+
+ScheduleLog.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Customer.hasMany(ScheduleLog, {
+    foreignKey: 'customer_id',
+    as: 'scheduleLogs'
+});
+
+// Cart-related associations
+Customer.hasOne(Cart, {
+    foreignKey: 'customer_id',
+    as: 'cart'
+});
+
+Cart.belongsTo(Customer, {
+    foreignKey: 'customer_id',
+    as: 'customer'
+});
+
+Cart.hasMany(CartItem, {
+    foreignKey: 'cart_id',
+    as: 'items'
+});
+
+CartItem.belongsTo(Cart, {
+    foreignKey: 'cart_id',
+    as: 'cart'
+});
+
+CartItem.belongsTo(Medicine, {
+    foreignKey: 'medicine_id',
+    as: 'medicine'
+});
+
+Medicine.hasMany(CartItem, {
+    foreignKey: 'medicine_id',
+    as: 'cartItems'
+});
+
 module.exports = {
     Invoice,
     InvoiceItem,
@@ -206,5 +303,10 @@ module.exports = {
     HealthRecord,
     HealthMetricsHistory,
     Allergy,
-    News
+    News,
+    Schedule,
+    ScheduleNotification,
+    ScheduleLog,
+    Cart,
+    CartItem
 };

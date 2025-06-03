@@ -86,14 +86,23 @@ const Medicines = () => {
             if (brandId) {
                 url.searchParams.append('brand_id', brandId);
             }
+            // Include related data in the response
+            url.searchParams.append('include', 'brand,supplier,location,category');
             
             const response = await axios.get(url.toString(), {
                 headers: { Authorization: `Bearer ${token}` },
             });
-            setMedicines(response.data || []);
+            
+            // Ensure the response data is properly formatted
+            const formattedMedicines = Array.isArray(response.data) 
+                ? response.data 
+                : [response.data].filter(Boolean);
+                
+            setMedicines(formattedMedicines);
         } catch (error) {
             console.error('Medicines: Error fetching medicines:', error);
             message.error('Failed to load medicines');
+            setMedicines([]);
         } finally {
             setLoading(false);
         }
@@ -356,14 +365,40 @@ const Medicines = () => {
             )
         },
         { title: 'Name', dataIndex: 'name', key: 'name', align: 'center', width: 150, render: (text) => (<Tooltip title={text}><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{text}</span></Tooltip>) },
-        { title: 'Brand', dataIndex: 'brand', key: 'brand', width: 120, align: 'center', render: (brand, record) => (<Tooltip title={record.brand_manufacturer ? `${brand?.name || 'N/A'} (${record.brand_manufacturer})` : brand?.name || 'N/A'}><span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>{brand?.name || 'N/A'}</span></Tooltip>) },
+        { title: 'Brand', dataIndex: 'brand_name', key: 'brand', width: 120, align: 'center', render: (brandName, record) => (
+            <Tooltip title={record.brand_manufacturer ? `${brandName || 'N/A'} (${record.brand_manufacturer})` : brandName || 'N/A'}>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block' }}>
+                    {brandName || 'N/A'}
+                </span>
+            </Tooltip>
+        )},
         { title: 'Price', dataIndex: 'price', key: 'price', width: 70, align: 'center', render: (price) => (<div style={{ textAlign: 'center', paddingRight: '12px' }}>${parseFloat(price || 0).toFixed(2)}</div>) },
         { title: 'Stock', dataIndex: 'quantity', key: 'quantity', width: 80, align: 'center', render: (quantity) => (<div style={{ textAlign: 'center' }}>{quantity || 0}</div>) },
         { title: 'Status', key: 'stockStatus', width: 100, align: 'center', render: (text, record) => (<Tag color={record.quantity <= 0 ? 'gray' : record.quantity < LOW_STOCK_THRESHOLD ? 'red' : 'green'}>{record.quantity <= 0 ? 'Out of Stock' : record.quantity < LOW_STOCK_THRESHOLD ? 'Low Stock' : 'In Stock'}</Tag>) },
         { title: 'Expiry', dataIndex: 'expiry_date', key: 'expiry_date', width: 100, align: 'center', render: (date) => { const d = new Date(date); return isNaN(d.getTime()) ? 'Invalid Date' : <Tag color="blue">{d.toLocaleDateString()}</Tag>; }},
-        { title: 'Supplier', dataIndex: ['supplier', 'name'], key: 'supplier', width: 120, align: 'center', render: (supplierName) => (<Tooltip title={supplierName}><div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{supplierName || 'N/A'}</div></Tooltip>) },
-        { title: 'Location', dataIndex: ['location', 'name'], key: 'location', width: 90, align: 'center', render: (locationName) => (<div style={{ textAlign: 'center' }}>{locationName || 'N/A'}</div>) },
-        { title: 'Category', dataIndex: ['category', 'name'], key: 'category', width: 120, align: 'center', render: (categoryName) => (<Tooltip title={categoryName}><div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>{categoryName || 'N/A'}</div></Tooltip>) },
+        { title: 'Supplier', dataIndex: 'supplier_name', key: 'supplier', width: 120, align: 'center', 
+            render: (supplierName) => (
+                <Tooltip title={supplierName}>
+                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                        {supplierName || 'N/A'}
+                    </div>
+                </Tooltip>
+            ) 
+        },
+        { title: 'Location', dataIndex: 'location_name', key: 'location', width: 90, align: 'center', 
+            render: (locationName) => (
+                <div style={{ textAlign: 'center' }}>{locationName || 'N/A'}</div>
+            ) 
+        },
+        { title: 'Category', dataIndex: 'category_name', key: 'category', width: 120, align: 'center', 
+            render: (categoryName) => (
+                <Tooltip title={categoryName}>
+                    <div style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'center' }}>
+                        {categoryName || 'N/A'}
+                    </div>
+                </Tooltip>
+            ) 
+        },
         {
             title: 'Actions', key: 'actions', fixed: 'right', width: 150, align: 'center',
             render: (text, record) => (

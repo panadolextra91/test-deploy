@@ -32,6 +32,9 @@ const healthRecordRoutes = require('./routes/healthRecordRoutes');
 const healthMetricsRoutes = require('./routes/healthMetricsRoutes');
 const allergyRoutes = require('./routes/allergyRoutes');
 const newsRoutes = require('./routes/newsRoutes');
+const pharmacyRoutes = require('./routes/pharmacyRoutes');
+const cartRoutes = require('./routes/cartRoutes');
+const scheduleRoutes = require('./routes/scheduleRoutes');
 
 const app = express();
 // Use PORT from .env or default to 3000
@@ -97,6 +100,9 @@ app.use('/api/health-records', healthRecordRoutes);
 app.use('/api/health-metrics', healthMetricsRoutes);
 app.use('/api/allergies', allergyRoutes);
 app.use('/api/news', newsRoutes);
+app.use('/api/pharmacies', pharmacyRoutes);
+app.use('/api/cart', cartRoutes);
+app.use('/api/schedules', scheduleRoutes);
 
 // Static file serving
 //app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -117,6 +123,6 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });

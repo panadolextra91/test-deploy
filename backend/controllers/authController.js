@@ -5,6 +5,13 @@ const jwt = require('jsonwebtoken');
 exports.loginWithPassword = async (req, res) => {
     const { phone, password } = req.body;
 
+    // Validate input
+    if (!phone || !password) {
+        return res.status(400).json({ 
+            error: 'Phone number and password are required' 
+        });
+    }
+
     try {
         // Find customer
         const customer = await Customer.findOne({ where: { phone } });
@@ -26,9 +33,19 @@ exports.loginWithPassword = async (req, res) => {
             return res.status(401).json({ error: 'Invalid password' });
         }
 
+        // Check if JWT_SECRET exists
+        if (!process.env.JWT_SECRET) {
+            console.error('JWT_SECRET is not defined in environment variables');
+            return res.status(500).json({ error: 'Server configuration error' });
+        }
+
         // Generate token
         const token = jwt.sign(
-            { id: customer.id, phone: customer.phone },
+            { 
+                id: customer.id, 
+                phone: customer.phone,
+                email: customer.email 
+            },
             process.env.JWT_SECRET,
             { expiresIn: '7d' }
         );
@@ -40,11 +57,13 @@ exports.loginWithPassword = async (req, res) => {
                 id: customer.id,
                 name: customer.name,
                 phone: customer.phone,
-                email: customer.email
+                email: customer.email,
+                verified: customer.verified,
+                hasPassword: !!customer.password
             }
         });
     } catch (error) {
         console.error('Error in loginWithPassword:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
-}; 
+};

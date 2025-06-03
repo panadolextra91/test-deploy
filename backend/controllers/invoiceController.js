@@ -1,8 +1,9 @@
 // invoiceController.js
-
 const { Invoice, InvoiceItem, Medicine, Customer, Product, Supplier, Brand, Category } = require('../models'); // Ensure models are imported
 const { Op } = require('sequelize');
 const sequelize = require('../config/database');
+const Sequelize = require('sequelize');
+
 
 // Helper function to handle medicine creation/update from product
 const handleMedicineFromProduct = async (product, quantity, transaction) => {
@@ -628,11 +629,13 @@ exports.getTopSellingBrands = async (req, res) => {
     try {
         console.log('Fetching top selling brands data...');
 
-        // Query to get top 5 brands by total quantity sold
+        // Query to get top 5 brands by total quantity sold with brand details
         const topBrands = await InvoiceItem.findAll({
             attributes: [
                 [sequelize.col('medicine.brand.id'), 'brand_id'],
                 [sequelize.col('medicine.brand.name'), 'brand_name'],
+                [sequelize.col('medicine.brand.logo'), 'brand_logo'],
+                [sequelize.col('medicine.brand.imagePublicId'), 'brand_image_public_id'],
                 [sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold'],
                 [sequelize.fn('SUM', sequelize.literal('InvoiceItem.quantity * InvoiceItem.price')), 'total_revenue']
             ],
@@ -659,7 +662,12 @@ exports.getTopSellingBrands = async (req, res) => {
                     required: true
                 }
             ],
-            group: ['medicine.brand.id', 'medicine.brand.name'],
+            group: [
+                'medicine.brand.id', 
+                'medicine.brand.name',
+                'medicine.brand.logo',
+                'medicine.brand.imagePublicId'
+            ],
             order: [[sequelize.fn('SUM', sequelize.col('InvoiceItem.quantity')), 'DESC']],
             limit: 5,
             raw: true
@@ -670,6 +678,8 @@ exports.getTopSellingBrands = async (req, res) => {
             rank: index + 1,
             brand_id: brand.brand_id,
             brand_name: brand.brand_name,
+            brand_logo: brand.brand_logo,
+            brand_image_public_id: brand.brand_image_public_id,
             total_quantity_sold: parseInt(brand.total_quantity_sold),
             total_revenue: parseFloat(brand.total_revenue).toFixed(2)
         }));
@@ -889,6 +899,178 @@ exports.getSalesByCategory = async (req, res) => {
             success: false,
             error: 'Failed to fetch sales by category data',
             details: error.message 
+        });
+    }
+};
+
+// CORRECTED Helper function for "last 7 days ending today"
+const getLast7DaysDateRange = () => {
+    const now = new Date(); // Current moment
+    // End of today
+    const endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
+
+    // Start of 7 days ago (inclusive of today means going back 6 days)
+    const startDate = new Date(endDate);
+    startDate.setDate(endDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0); // Start of that day
+
+    return { startDate, endDate };
+};
+
+// Helper function to get the start and end of the current month (This one is correct for "current calendar month")
+const getCurrentMonthDateRange = () => {
+    const now = new Date();
+    const startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of the current month
+    endDate.setHours(23, 59, 59, 999); // End of the last day
+
+    return { startDate, endDate };
+};
+
+// Get top 5 selling medicines of the week (uses "last 7 days ending today")
+exports.getTopSellingMedicinesOfWeek = async (req, res) => {
+    try {
+        const { startDate, endDate } = getLast7DaysDateRange(); // CHANGED to use the correct helper
+        console.log(`Fetching top selling medicines for the past 7 days: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+        const topMedicines = await InvoiceItem.findAll({
+            attributes: [
+                [Sequelize.col('medicine.id'), 'medicine_id'],
+                [Sequelize.col('medicine.name'), 'medicine_name'],
+                [Sequelize.col('medicine.image'), 'medicine_image'],
+                [Sequelize.col('medicine.price'), 'medicine_price'],
+                [Sequelize.fn('SUM', Sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold']
+            ],
+            include: [
+                {
+                    model: Medicine,
+                    as: 'medicine',
+                    attributes: [],
+                    required: true
+                },
+                {
+                    model: Invoice,
+                    as: 'invoice',
+                    attributes: [],
+                    where: {
+                        type: 'sale',
+                        invoice_date: {
+                            [Op.between]: [startDate, endDate]
+                        }
+                    },
+                    required: true
+                }
+            ],
+            group: [
+                Sequelize.col('medicine.id'),
+                Sequelize.col('medicine.name'),
+                Sequelize.col('medicine.image'),
+                Sequelize.col('medicine.price')
+            ],
+            order: [[Sequelize.fn('SUM', Sequelize.col('InvoiceItem.quantity')), 'DESC']],
+            limit: 5,
+            raw: true
+        });
+
+        const formattedTopMedicines = topMedicines.map((med, index) => ({
+            rank: index + 1,
+            medicine_id: med.medicine_id,
+            medicine_name: med.medicine_name,
+            medicine_image: med.medicine_image,
+            medicine_price: parseFloat(med.medicine_price).toFixed(2),
+            total_quantity_sold: parseInt(med.total_quantity_sold)
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: formattedTopMedicines,
+            dateRange: {
+                start: startDate.toISOString().split('T')[0],
+                end: endDate.toISOString().split('T')[0]
+            },
+            message: 'Top 5 selling medicines of the past 7 days retrieved successfully'
+        });
+
+    } catch (error) {
+        console.error('Error in getTopSellingMedicinesOfWeek:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch top selling medicines of the week',
+            details: error.message
+        });
+    }
+};
+
+// Get top 5 selling medicines of the current month (this function was logically correct for "current calendar month")
+exports.getTopSellingMedicinesOfMonth = async (req, res) => {
+    try {
+        const { startDate, endDate } = getCurrentMonthDateRange();
+        console.log(`Fetching top selling medicines for month: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+
+        const topMedicines = await InvoiceItem.findAll({
+            attributes: [
+                [Sequelize.col('medicine.id'), 'medicine_id'],
+                [Sequelize.col('medicine.name'), 'medicine_name'],
+                [Sequelize.col('medicine.image'), 'medicine_image'],
+                [Sequelize.col('medicine.price'), 'medicine_price'],
+                [Sequelize.fn('SUM', Sequelize.col('InvoiceItem.quantity')), 'total_quantity_sold']
+            ],
+            include: [
+                {
+                    model: Medicine,
+                    as: 'medicine',
+                    attributes: [],
+                    required: true
+                },
+                {
+                    model: Invoice,
+                    as: 'invoice',
+                    attributes: [],
+                    where: {
+                        type: 'sale',
+                        invoice_date: {
+                            [Op.between]: [startDate, endDate]
+                        }
+                    },
+                    required: true
+                }
+            ],
+            group: [
+                Sequelize.col('medicine.id'),
+                Sequelize.col('medicine.name'),
+                Sequelize.col('medicine.image'),
+                Sequelize.col('medicine.price')
+            ],
+            order: [[Sequelize.fn('SUM', Sequelize.col('InvoiceItem.quantity')), 'DESC']],
+            limit: 5,
+            raw: true
+        });
+        
+        const formattedTopMedicines = topMedicines.map((med, index) => ({
+            rank: index + 1,
+            medicine_id: med.medicine_id,
+            medicine_name: med.medicine_name,
+            medicine_image: med.medicine_image,
+            medicine_price: parseFloat(med.medicine_price).toFixed(2),
+            total_quantity_sold: parseInt(med.total_quantity_sold)
+        }));
+
+        res.status(200).json({
+            success: true,
+            data: formattedTopMedicines,
+            dateRange: {
+                start: startDate.toISOString().split('T')[0],
+                end: endDate.toISOString().split('T')[0]
+            },
+            message: 'Top 5 selling medicines of the month retrieved successfully'
+        });
+
+    } catch (error) {
+        console.error('Error in getTopSellingMedicinesOfMonth:', error);
+        res.status(500).json({
+            success: false,
+            error: 'Failed to fetch top selling medicines of the month',
+            details: error.message
         });
     }
 };
