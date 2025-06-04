@@ -3,7 +3,20 @@ const router = express.Router();
 const pharmaSalesRepController = require('../controllers/pharmaSalesRepController');
 const authenticate = require('../middleware/authMiddleware');
 const authorize = require('../middleware/authorizeMiddleware');
+const authenticateSalesRep = require('../middleware/salesRepAuthMiddleware');
 
+// Public routes for sales reps
+router.post('/register', pharmaSalesRepController.registerSalesRep);
+router.post('/login', pharmaSalesRepController.loginSalesRep);
+router.post('/forgot-password', pharmaSalesRepController.forgotSalesRepPassword);
+router.post('/reset-password', pharmaSalesRepController.resetSalesRepPassword);
+
+// Protected routes for sales reps (self-service)
+router.get('/profile', authenticateSalesRep, pharmaSalesRepController.getSalesRepProfile);
+router.put('/profile', authenticateSalesRep, pharmaSalesRepController.updateSalesRepProfile);
+router.put('/change-password', authenticateSalesRep, pharmaSalesRepController.changeSalesRepPassword);
+
+// Admin routes for managing sales reps
 // Get all sales reps
 router.get(
   '/',
@@ -28,7 +41,7 @@ router.get(
   pharmaSalesRepController.getSalesRepByName
 );
 
-// Create new sales rep
+// Create new sales rep (admin only)
 router.post(
   '/',
   authenticate,
@@ -36,7 +49,7 @@ router.post(
   pharmaSalesRepController.createSalesRep
 );
 
-// Update sales rep
+// Update sales rep (admin only)
 router.put(
   '/:id',
   authenticate,
@@ -44,7 +57,7 @@ router.put(
   pharmaSalesRepController.updateSalesRep
 );
 
-// Delete sales rep
+// Delete sales rep (admin only)
 router.delete(
   '/:id',
   authenticate,

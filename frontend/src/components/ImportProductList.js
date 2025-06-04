@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import axios from 'axios';
-import { Button, CircularProgress, Alert, Collapse } from '@mui/material';
+import { Button, CircularProgress, Alert } from '@mui/material';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { styled } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 import './ImportProductList.css';
 
 const VisuallyHiddenInput = styled('input')({
@@ -19,24 +20,56 @@ const VisuallyHiddenInput = styled('input')({
 
 const ImportProductList = () => {
   const fileInputRef = useRef(null);
+  const navigate = useNavigate();
   const [file, setFile] = useState(null);
-  const [showAdditionalFields, setShowAdditionalFields] = useState(false);
-  const [formData, setFormData] = useState({
-    supplier_name: '',
-    supplier_contact_info: '',
-    supplier_address: '',
-    name: '',
-    email: '',
-    phone: ''
-  });
   const [loading, setLoading] = useState(false);
-  const [csvLoading, setCsvLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [csvData, setCsvData] = useState({ pharmaSalesRepName: '', supplierName: '' });
-  const [validationErrors, setValidationErrors] = useState({});
+  const [salesRepInfo, setSalesRepInfo] = useState(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  const parseCSV = (file) => {
+  // Check authentication on component mount
+  useEffect(() => {
+    const token = sessionStorage.getItem('salesRepToken') || localStorage.getItem('salesRepToken');
+    const salesRepData = sessionStorage.getItem('salesRepInfo') || localStorage.getItem('salesRepInfo');
+    
+    if (token && salesRepData) {
+      try {
+        const parsedSalesRep = JSON.parse(salesRepData);
+        setSalesRepInfo(parsedSalesRep);
+        setIsAuthenticated(true);
+      } catch (err) {
+        console.error('Error parsing sales rep info:', err);
+        handleLogout();
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    // Clear authentication data
+    sessionStorage.removeItem('salesRepToken');
+    sessionStorage.removeItem('salesRepInfo');
+    localStorage.removeItem('salesRepToken');
+    localStorage.removeItem('salesRepInfo');
+    
+    // Redirect to login
+    navigate('/pharma-sales-login');
+  };
+
+  const handleLoginRedirect = () => {
+    navigate('/pharma-sales-login');
+  };
+
+  const handleFileChange = (e) => {
+    const selectedFile = e.target.files[0];
+    if (!selectedFile) return;
+
+    setFile(selectedFile);
+    setError('');
+    setSuccess('');
+  };
+
+  const validateCSV = (file) => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -48,184 +81,19 @@ const ImportProductList = () => {
         }
 
         const headers = lines[0].split(',').map(header => header.trim().toLowerCase());
-        const requiredColumns = ['pharmasalesrepname', 'suppliername'];
+        const requiredColumns = ['brand', 'name', 'price', 'expiry_date'];
         const missingColumns = requiredColumns.filter(col => !headers.includes(col));
+        
         if (missingColumns.length > 0) {
           reject(new Error(`Missing required columns: ${missingColumns.join(', ')}`));
           return;
         }
 
-        const firstDataRow = lines[1].split(',').map(cell => cell.trim());
-        const pharmaSalesRepNameIndex = headers.indexOf('pharmasalesrepname');
-        const supplierNameIndex = headers.indexOf('suppliername');
-        resolve({
-          pharmaSalesRepName: firstDataRow[pharmaSalesRepNameIndex] || '',
-          supplierName: firstDataRow[supplierNameIndex] || ''
-        });
+        resolve(true);
       };
       reader.onerror = () => reject(new Error('Error reading the file'));
       reader.readAsText(file);
     });
-  };
-
-  const handleFileChange = async (e) => {
-    const selectedFile = e.target.files[0];
-    if (!selectedFile) return;
-
-    try {
-      setCsvLoading(true);
-      setError('');
-      setSuccess('');
-      
-      // Parse CSV to get pharmaSalesRepName and supplierName
-      const { pharmaSalesRepName, supplierName } = await parseCSV(selectedFile);
-      
-      // Set CSV data
-      setCsvData({ pharmaSalesRepName, supplierName });
-      
-      // Pre-populate form fields with CSV data
-      setFormData(prev => ({
-        ...prev,
-        supplier_name: supplierName,
-        name: pharmaSalesRepName
-      }));
-      
-      setFile(selectedFile);
-      
-      // Try to import immediately to check if supplier/rep exist
-      await attemptImport(selectedFile);
-      
-    } catch (err) {
-      setError(err.message || 'Error processing CSV file');
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    } finally {
-      setCsvLoading(false);
-    }
-  };
-
-  const attemptImport = async (file) => {
-    try {
-      // Attempt to import without additional fields
-      const formDataToSend = new FormData();
-      formDataToSend.append('file', file);
-      
-      const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/products/import-external`, formDataToSend, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      
-      // Success - supplier and sales rep already exist
-      setSuccess(response.data.message || 'Products imported successfully!');
-      setShowAdditionalFields(false);
-      
-      // Reset form
-      setFile(null);
-      setFormData({
-        supplier_name: '',
-        supplier_contact_info: '',
-        supplier_address: '',
-        name: '',
-        email: '',
-        phone: ''
-      });
-      setCsvData({ pharmaSalesRepName: '', supplierName: '' });
-      
-      // Reset file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      
-    } catch (err) {
-      const errorData = err.response?.data;
-      
-      if (errorData?.required_fields) {
-        // Backend is asking for additional information
-        setShowAdditionalFields(true);
-        
-        // Pre-populate with CSV data from backend response if available
-        if (errorData.supplier_name_from_csv) {
-          setFormData(prev => ({
-            ...prev,
-            supplier_name: errorData.supplier_name_from_csv
-          }));
-        }
-        if (errorData.sales_rep_name_from_csv) {
-          setFormData(prev => ({
-            ...prev,
-            name: errorData.sales_rep_name_from_csv
-          }));
-        }
-        
-        // Don't show error message here, just show the form
-        setError('');
-      } else {
-        // Other errors
-        setError(errorData?.error || 'Failed to import products');
-        setShowAdditionalFields(false);
-        
-        // Reset file on error
-        setFile(null);
-        if (fileInputRef.current) {
-          fileInputRef.current.value = '';
-        }
-      }
-    }
-  };
-
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear validation error when user types
-    if (validationErrors[name]) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const errors = {};
-    
-    // Only validate if additional fields are shown
-    if (!showAdditionalFields) {
-      return true;
-    }
-    
-    const requiredFields = ['supplier_name', 'supplier_contact_info', 'supplier_address', 'name', 'email', 'phone'];
-    
-    requiredFields.forEach(field => {
-      if (!formData[field].trim()) {
-        errors[field] = 'This field is required';
-      }
-    });
-
-    // Email validation
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address';
-    }
-
-    // Validate that supplier_name matches CSV data
-    if (formData.supplier_name.trim() && csvData.supplierName && 
-        formData.supplier_name.trim() !== csvData.supplierName) {
-      errors.supplier_name = `Must match CSV: "${csvData.supplierName}"`;
-    }
-
-    // Validate that name matches CSV data
-    if (formData.name.trim() && csvData.pharmaSalesRepName && 
-        formData.name.trim() !== csvData.pharmaSalesRepName) {
-      errors.name = `Must match CSV: "${csvData.pharmaSalesRepName}"`;
-    }
-
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
   };
 
   const handleSubmit = async (e) => {
@@ -238,75 +106,126 @@ const ImportProductList = () => {
       return;
     }
 
-    if (!validateForm()) {
+    if (!isAuthenticated) {
+      setError('Please login first to upload products');
       return;
     }
 
-    const formDataToSend = new FormData();
-    formDataToSend.append('file', file);
-    
-    // Append all additional fields
-    Object.keys(formData).forEach(key => {
-      if (formData[key].trim()) {
-        formDataToSend.append(key, formData[key].trim());
-      }
-    });
-
     try {
       setLoading(true);
-      const response = await axios.post(`${process.env.REACT_APP_BACKEND_URL}/api/products/import-external`, formDataToSend, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      
+      // Validate CSV format
+      await validateCSV(file);
+
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const token = sessionStorage.getItem('salesRepToken') || localStorage.getItem('salesRepToken');
+
+      const response = await axios.post(
+        `${process.env.REACT_APP_BACKEND_URL}/api/products/import-external`, 
+        formData, 
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            'Authorization': `Bearer ${token}`
+          },
+        }
+      );
 
       setSuccess(response.data.message || 'Products imported successfully!');
-      setShowAdditionalFields(false);
       
       // Reset form
       setFile(null);
-      setFormData({
-        supplier_name: '',
-        supplier_contact_info: '',
-        supplier_address: '',
-        name: '',
-        email: '',
-        phone: ''
-      });
-      setCsvData({ pharmaSalesRepName: '', supplierName: '' });
-      
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      
     } catch (err) {
       const errorData = err.response?.data;
+      
+      if (err.response?.status === 401) {
+        setError('Your session has expired. Please login again.');
+        handleLogout();
+        return;
+      }
       
       if (errorData?.error) {
         setError(errorData.error);
       } else {
-        setError('Failed to import products. Please try again.');
-      }
-      
-      // Handle validation errors from server
-      if (errorData?.required_fields) {
-        const serverErrors = {};
-        Object.keys(errorData.required_fields).forEach(field => {
-          serverErrors[field] = `Please provide ${errorData.required_fields[field]}`;
-        });
-        setValidationErrors(serverErrors);
+        setError(err.message || 'Failed to import products. Please try again.');
       }
     } finally {
       setLoading(false);
     }
   };
 
+  // Show login prompt if not authenticated
+  if (!isAuthenticated) {
+    return (
+      <div className="app-container">
+        <div className="container">
+          <div className="paper">
+            <h1 className="typography-h4">Import Product List</h1>
+            <p className="typography-subtitle1">Please login to upload your product catalog</p>
+
+            <hr className="divider" />
+
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <Alert className="alert alert-info" style={{ marginBottom: '24px' }}>
+                <strong>Authentication Required</strong><br/>
+                You need to login as a pharma sales representative to upload product lists.
+              </Alert>
+              
+              <Button
+                variant="contained"
+                onClick={handleLoginRedirect}
+                sx={{ textTransform: 'none', marginRight: '16px' }}
+              >
+                Login as Sales Rep
+              </Button>
+              
+              <Button
+                variant="outlined"
+                onClick={() => navigate('/')}
+                sx={{ textTransform: 'none' }}
+              >
+                Back to Main Login
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="app-container">
       <div className="container">
         <div className="paper">
-          <h1 className="typography-h4">Import Product List</h1>
-          <p className="typography-subtitle1">Upload your product list in CSV format to market your products</p>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+            <div>
+              <h1 className="typography-h4" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <CloudUploadIcon style={{ fontSize: '32px', color: 'black' }} />
+                Import Product List
+              </h1>
+              <p className="typography-subtitle1">Upload your product catalog in CSV format</p>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
+                Logged in as: <strong>{salesRepInfo?.name}</strong><br/>
+                Supplier: <strong>{salesRepInfo?.supplier?.name}</strong>
+              </p>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={handleLogout}
+                sx={{ textTransform: 'none', marginTop: '8px' }}
+              >
+                Logout
+              </Button>
+            </div>
+          </div>
 
           <hr className="divider" />
 
@@ -323,8 +242,8 @@ const ImportProductList = () => {
               <Button
                 className="upload-button"
                 component="label"
-                startIcon={csvLoading ? <CircularProgress size={20} /> : <CloudUploadIcon />}
-                disabled={csvLoading}
+                startIcon={<CloudUploadIcon />}
+                disabled={loading}
                 sx={{ textTransform: 'none' }}
               >
                 {file ? file.name : 'Choose CSV File'}
@@ -334,129 +253,64 @@ const ImportProductList = () => {
                   type="file" 
                   accept=".csv, text/csv"
                   onChange={handleFileChange}
-                  disabled={csvLoading}
+                  disabled={loading}
                 />
               </Button>
-              <p className="typography-caption">CSV should include columns: pharmaSalesRepName, supplierName, brand, name, price, expiry_date</p>
+              <p className="typography-caption">
+                CSV should include columns: <strong>brand, name, price, expiry_date</strong><br/>
+                <em>Note: No need to include your name or supplier name - this is automatically detected from your login.</em>
+              </p>
             </div>
 
-            {csvData.supplierName && csvData.pharmaSalesRepName && (
+            {file && (
               <Alert className="alert alert-info" style={{ marginTop: '16px' }}>
-                <strong>CSV Data Detected:</strong><br/>
-                Supplier: <strong>{csvData.supplierName}</strong><br/>
-                Sales Rep: <strong>{csvData.pharmaSalesRepName}</strong>
+                <strong>Ready to Import:</strong><br/>
+                File: <strong>{file.name}</strong><br/>
+                Will be imported for: <strong>{salesRepInfo?.name}</strong> ({salesRepInfo?.supplier?.name})
               </Alert>
             )}
 
-            <Collapse in={showAdditionalFields}>
-              <div style={{ marginTop: '24px', padding: '24px', border: '1px solid #ddd', borderRadius: '8px' }}>
-                <h2 className="typography-h6">Additional Information Required</h2>
-                <p className="typography-body2">The supplier and/or sales rep were not found in our system. Please provide the following details to create them.</p>
-                
-                <h3 className="typography-subtitle2">Supplier Information</h3>
-                <div className="grid-container grid-item-2">
-                  <div className="input-group">
-                    <label htmlFor="supplier_name">Supplier Company Name</label>
-                    <input
-                      required
-                      id="supplier_name"
-                      name="supplier_name"
-                      value={formData.supplier_name}
-                      onChange={handleInputChange}
-                      placeholder="Supplier Company Name"
-                    />
-                    {validationErrors.supplier_name && <span className="error-text">{validationErrors.supplier_name}</span>}
-                  </div>
-                  <div className="input-group">
-                    <label htmlFor="supplier_contact_info">Supplier Contact Email</label>
-                    <input
-                      required
-                      id="supplier_contact_info"
-                      name="supplier_contact_info"
-                      type="email"
-                      value={formData.supplier_contact_info}
-                      onChange={handleInputChange}
-                      placeholder="Supplier Contact Email"
-                    />
-                    {validationErrors.supplier_contact_info && <span className="error-text">{validationErrors.supplier_contact_info}</span>}
-                  </div>
-                  <div className="input-group full-width">
-                    <label htmlFor="supplier_address">Supplier Address</label>
-                    <textarea
-                      required
-                      id="supplier_address"
-                      name="supplier_address"
-                      value={formData.supplier_address}
-                      onChange={handleInputChange}
-                      placeholder="Supplier Address"
-                    />
-                    {validationErrors.supplier_address && <span className="error-text">{validationErrors.supplier_address}</span>}
-                  </div>
-                </div>
-
-                <h3 className="typography-subtitle2">Your Information</h3>
-                <div className="grid-container grid-item-3">
-                  <div className="input-group">
-                    <label htmlFor="name">Your Full Name</label>
-                    <input
-                      required
-                      id="name"
-                      name="name"
-                      value={formData.name}
-                      onChange={handleInputChange}
-                      placeholder="Your Full Name"
-                    />
-                    {validationErrors.name && <span className="error-text">{validationErrors.name}</span>}
-                  </div>
-                  <div className="input-group">
-                    <label htmlFor="email">Your Email</label>
-                    <input
-                      required
-                      id="email"
-                      name="email"
-                      type="email"
-                      value={formData.email}
-                      onChange={handleInputChange}
-                      placeholder="Your Email"
-                    />
-                    {validationErrors.email && <span className="error-text">{validationErrors.email}</span>}
-                  </div>
-                  <div className="input-group">
-                    <label htmlFor="phone">Your Phone Number</label>
-                    <input
-                      required
-                      id="phone"
-                      name="phone"
-                      value={formData.phone}
-                      onChange={handleInputChange}
-                      placeholder="Your Phone Number"
-                    />
-                    {validationErrors.phone && <span className="error-text">{validationErrors.phone}</span>}
-                  </div>
-                </div>
-              </div>
-            </Collapse>
-
-            {showAdditionalFields && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
-                <Button
-                  type="submit"
-                  className="submit-button"
-                  disabled={loading || !file}
-                  sx={{ textTransform: 'none' }}
-                >
-                  {loading ? (
-                    <>
-                      <CircularProgress size={20} style={{ marginRight: '8px' }} />
-                      Uploading...
-                    </>
-                  ) : (
-                    'Complete Import'
-                  )}
-                </Button>
-              </div>
-            )}
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '32px' }}>
+              <Button
+                type="submit"
+                className="submit-button"
+                disabled={loading || !file}
+                sx={{ textTransform: 'none' }}
+              >
+                {loading ? (
+                  <>
+                    <CircularProgress size={20} style={{ marginRight: '8px' }} />
+                    Uploading...
+                  </>
+                ) : (
+                  'Import Products'
+                )}
+              </Button>
+            </div>
           </form>
+
+          <div style={{ 
+            marginTop: '32px', 
+            padding: '16px', 
+            backgroundColor: '#f6f8fa', 
+            borderRadius: '8px',
+            fontSize: '14px'
+          }}>
+            <h3 style={{ margin: '0 0 12px 0', fontSize: '16px' }}>CSV Format Example:</h3>
+            <pre style={{ 
+              backgroundColor: '#fff', 
+              padding: '12px', 
+              borderRadius: '4px', 
+              margin: 0,
+              fontSize: '12px',
+              overflow: 'auto'
+            }}>
+{`brand,name,price,expiry_date
+Panadol,Paracetamol 500mg,5.50,2024-12-31
+Aspirin,Aspirin 100mg,3.25,2025-06-15
+Vitamin C,Vitamin C 1000mg,12.00,2025-03-20`}
+            </pre>
+          </div>
         </div>
       </div>
     </div>

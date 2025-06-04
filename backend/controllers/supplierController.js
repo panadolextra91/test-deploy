@@ -116,3 +116,58 @@ exports.deleteSupplier = async (req, res) => {
         });
     }
 };
+
+// Find or create supplier by name (for registration)
+exports.findOrCreateSupplier = async (req, res) => {
+    const { name, contact_info, address } = req.body;
+    
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Supplier name is required' });
+    }
+
+    try {
+        const { Op } = require('sequelize');
+        
+        // First, try to find existing supplier by name (case-insensitive)
+        let supplier = await Supplier.findOne({
+            where: {
+                name: {
+                    [Op.like]: `%${name.trim()}%`
+                }
+            }
+        });
+
+        // If not found with LIKE, try exact match with different cases
+        if (!supplier) {
+            const allSuppliers = await Supplier.findAll();
+            supplier = allSuppliers.find(s => 
+                s.name.toLowerCase() === name.trim().toLowerCase()
+            );
+        }
+
+        if (supplier) {
+            // Supplier exists, return it
+            return res.status(200).json({
+                supplier,
+                created: false,
+                message: 'Existing supplier found'
+            });
+        }
+
+        // Supplier doesn't exist, create new one
+        supplier = await Supplier.create({
+            name: name.trim(),
+            contact_info: contact_info || null,
+            address: address || null
+        });
+
+        res.status(201).json({
+            supplier,
+            created: true,
+            message: 'New supplier created'
+        });
+    } catch (error) {
+        console.error('Error finding or creating supplier:', error);
+        res.status(500).json({ error: 'Failed to find or create supplier' });
+    }
+};

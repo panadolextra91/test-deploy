@@ -100,9 +100,12 @@ const Login = () => {
                     <a href="/forgot-password" className="forgot-password">Forgot Password?</a>
 
                     <button type="submit" className="login-button">Sign In</button>
-                    <a href="/import-product-list" className="sale-products-link">
-                        Want to introduce your company's products? Click here!
-                    </a>
+                    
+                    <div style={{ marginTop: '16px', textAlign: 'center' }}>
+                        <a href="/pharma-sales-login" className="sale-products-link">
+                            Are you a Pharma Sales Rep? Click here to login!
+                        </a>
+                    </div>
                 </form>
             </div>
         </div>

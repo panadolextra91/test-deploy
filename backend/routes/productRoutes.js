@@ -3,11 +3,13 @@ const router        = express.Router();
 const productController = require('../controllers/productController');
 const authenticate  = require('../middleware/authMiddleware');
 const authorize     = require('../middleware/authorizeMiddleware');
+const authenticateSalesRep = require('../middleware/salesRepAuthMiddleware');
 const upload        = require('../middleware/multer')();  // for CSV import
 
-// External CSV import for pharma sales reps (no authentication required)
+// CSV import for authenticated pharma sales reps
 router.post(
   '/import-external',
+  authenticateSalesRep,
   upload.single('file'),
   productController.importCsvExternal
 );

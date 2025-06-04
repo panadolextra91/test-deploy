@@ -370,11 +370,26 @@ exports.filterBySupplierAndMonth = async (req, res) => {
   }
 };
 
-// 6) External CSV import for pharma sales reps (no authentication required)
+// 6) External CSV import for authenticated pharma sales reps
 exports.importCsvExternal = async (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'No CSV file uploaded' });
   
   try {
+    // Get authenticated sales rep information
+    const salesRepId = req.salesRep.id;
+    const salesRep = await PharmaSalesRep.findByPk(salesRepId, {
+      include: [{
+        model: Supplier,
+        as: 'supplier',
+        attributes: ['id', 'name', 'contact_info', 'address']
+      }]
+    });
+
+    if (!salesRep) {
+      await fs.unlink(req.file.path);
+      return res.status(404).json({ error: 'Sales rep not found' });
+    }
+
     // Use single pharmacy (ID = 1) approach
     const pharmacy_id = 1;
     
@@ -400,208 +415,28 @@ exports.importCsvExternal = async (req, res) => {
       return res.status(400).json({ error: 'CSV file is empty' });
     }
 
-    // Extract pharmaSalesName and supplierName from first row
+    // Validate CSV format - check if it has required columns
     const firstRow = records[0];
-    const { pharmaSalesRepName, supplierName } = firstRow;
-
-    if (!pharmaSalesRepName || !supplierName) {
+    const requiredColumns = ['brand', 'name', 'price', 'expiry_date'];
+    const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+    
+    if (missingColumns.length > 0) {
       await fs.unlink(req.file.path);
       return res.status(400).json({ 
-        error: 'CSV must contain pharmaSalesRepName and supplierName columns' 
+        error: 'CSV missing required columns',
+        missing_columns: missingColumns,
+        required_columns: requiredColumns,
+        found_columns: Object.keys(firstRow)
       });
     }
 
-    // Check if supplier exists
-    let supplier = await Supplier.findOne({ 
-      where: { name: supplierName.trim() }
-    });
-
-    // If supplier doesn't exist, check if supplier info is provided
-    if (!supplier) {
-      const { 
-        supplier_name, 
-        supplier_contact_info, 
-        supplier_address,
-        name, 
-        email, 
-        phone
-      } = req.body;
-      
-      if (!supplier_name || !supplier_contact_info || !supplier_address || !name || !email || !phone) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Supplier not found. Please provide the following information:',
-          required_fields: {
-            supplier_name: 'Supplier company name',
-            supplier_contact_info: 'Supplier contact email',
-            supplier_address: 'Supplier address',
-            name: 'Your full name',
-            email: 'Your email address',
-            phone: 'Your phone number'
-          },
-          supplier_name_from_csv: supplierName,
-          sales_rep_name_from_csv: pharmaSalesRepName
-        });
-      }
-
-      // Validate that supplier_name matches supplierName from CSV
-      if (supplier_name.trim() !== supplierName.trim()) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Supplier name mismatch',
-          message: 'The supplier name you provided does not match the supplier name in your CSV file',
-          your_input: supplier_name.trim(),
-          csv_file_has: supplierName.trim(),
-          solution: 'Please ensure the supplier_name matches exactly with the supplierName in your CSV file'
-        });
-      }
-
-      // Validate that name matches pharmaSalesRepName from CSV
-      if (name.trim() !== pharmaSalesRepName.trim()) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Sales rep name mismatch',
-          message: 'Your name does not match the pharmaSalesRepName in your CSV file',
-          your_input: name.trim(),
-          csv_file_has: pharmaSalesRepName.trim(),
-          solution: 'Please ensure your name matches exactly with the pharmaSalesRepName in your CSV file'
-        });
-      }
-
-      // Check if email already exists
-      const existingEmail = await PharmaSalesRep.findOne({ where: { email: email.trim() } });
-      if (existingEmail) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({ 
-          error: 'Email address already in use by another sales rep' 
-        });
-      }
-
-      // Create new supplier
-      try {
-        supplier = await Supplier.create({
-          name: supplier_name.trim(),
-          contact_info: supplier_contact_info.trim(),
-          address: supplier_address.trim()
-        });
-      } catch (err) {
-        await fs.unlink(req.file.path);
-        return res.status(500).json({ 
-          error: 'Failed to create supplier',
-          details: err.message 
-        });
-      }
-
-      // Create new sales rep
-      try {
-        const salesRep = await PharmaSalesRep.create({
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          supplier_id: supplier.id
-        });
-
-        // Import products
-        const { imported, errors } = await importProductsForSalesRep(records, supplier, salesRep, pharmacy_id);
-
-        await fs.unlink(req.file.path);
-        
-        return res.json({ 
-          success: true,
-          message: `Supplier and sales rep created successfully. Products imported by ${salesRep.name}`,
-          imported,
-          sales_rep: {
-            id: salesRep.id,
-            name: salesRep.name,
-            email: salesRep.email
-          },
-          supplier: {
-            id: supplier.id,
-            name: supplier.name,
-            contact_info: supplier.contact_info
-          },
-          target_pharmacy: {
-            id: targetPharmacy.id,
-            name: targetPharmacy.name
-          },
-          errors: errors.length > 0 ? errors : undefined
-        });
-
-      } catch (err) {
-        await fs.unlink(req.file.path);
-        return res.status(500).json({ 
-          error: 'Failed to create sales rep account',
-          details: err.message 
-        });
-      }
-    }
-
-    // Supplier exists, check if sales rep exists
-    let salesRep = await PharmaSalesRep.findOne({
-      where: { 
-        name: pharmaSalesRepName.trim(),
-        supplier_id: supplier.id 
-      }
-    });
-
-    // If sales rep doesn't exist, check if additional info is provided
-    if (!salesRep) {
-      const { name, email, phone } = req.body;
-      
-      if (!name || !email || !phone) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Sales rep not found. Please provide the following information:',
-          required_fields: {
-            name: 'Your full name',
-            email: 'Your email address',
-            phone: 'Your phone number'
-          },
-          supplier_name: supplierName,
-          sales_rep_name: pharmaSalesRepName
-        });
-      }
-
-      // Validate that name matches pharmaSalesRepName from CSV
-      if (name.trim() !== pharmaSalesRepName.trim()) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({
-          error: 'Sales rep name mismatch',
-          message: 'Your name does not match the pharmaSalesRepName in your CSV file',
-          your_input: name.trim(),
-          csv_file_has: pharmaSalesRepName.trim(),
-          solution: 'Please ensure your name matches exactly with the pharmaSalesRepName in your CSV file'
-        });
-      }
-
-      // Check if email already exists
-      const existingEmail = await PharmaSalesRep.findOne({ where: { email: email.trim() } });
-      if (existingEmail) {
-        await fs.unlink(req.file.path);
-        return res.status(400).json({ 
-          error: 'Email address already in use by another sales rep' 
-        });
-      }
-
-      // Create new sales rep
-      try {
-        salesRep = await PharmaSalesRep.create({
-          name: name.trim(),
-          email: email.trim(),
-          phone: phone.trim(),
-          supplier_id: supplier.id
-        });
-      } catch (err) {
-        await fs.unlink(req.file.path);
-        return res.status(500).json({ 
-          error: 'Failed to create sales rep account',
-          details: err.message 
-        });
-      }
-    }
-
-    // Import products
-    const { imported, errors } = await importProductsForSalesRep(records, supplier, salesRep, pharmacy_id);
+    // Import products using the authenticated sales rep's information
+    const { imported, errors } = await importProductsForSalesRep(
+      records, 
+      salesRep.supplier, 
+      salesRep, 
+      pharmacy_id
+    );
 
     await fs.unlink(req.file.path);
     
@@ -615,12 +450,18 @@ exports.importCsvExternal = async (req, res) => {
         email: salesRep.email
       },
       supplier: {
-        id: supplier.id,
-        name: supplier.name
+        id: salesRep.supplier.id,
+        name: salesRep.supplier.name,
+        contact_info: salesRep.supplier.contact_info
       },
       target_pharmacy: {
         id: targetPharmacy.id,
         name: targetPharmacy.name
+      },
+      summary: {
+        total_products_imported: imported,
+        total_errors: errors.length,
+        import_date: new Date().toISOString()
       },
       errors: errors.length > 0 ? errors : undefined
     });

@@ -16,6 +16,8 @@ import PharmaSalesReps from "./components/PharmaSalesReps";
 import Brands from "./components/Brands";
 import ImportProductList from "./components/ImportProductList";
 import Orders from "./components/Orders";
+import PharmaSalesLogin from "./components/PharmaSalesLogin";
+import PharmaSalesRegister from "./components/PharmaSalesRegister";
 
 function App() {
     const ProtectedRoute = ({ children, roles }) => {
@@ -46,6 +48,8 @@ function App() {
                 {/* Public Routes */}
                 <Route path="/" element={<Login />} />
                 <Route path='/forgot-password' element={<ForgotPassword />} />
+                <Route path='/pharma-sales-login' element={<PharmaSalesLogin />} />
+                <Route path='/pharma-sales-register' element={<PharmaSalesRegister />} />
                 <Route path='/import-product-list' element={<ImportProductList />} />
 
                 {/* Protected Routes */}

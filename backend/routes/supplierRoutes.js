@@ -5,6 +5,10 @@ const authorize = require('../middleware/authorizeMiddleware');
 const router = express.Router();
 //supplierRoutes.js
 
+// Public route for registration purposes
+router.get('/public', supplierController.getAllSuppliers);
+router.post('/find-or-create', supplierController.findOrCreateSupplier);
+
 // Define routes
 router.get('/', authenticateToken, authorize('admin', 'pharmacist'), supplierController.getAllSuppliers);
 router.get('/:id', authenticateToken, authorize('admin', 'pharmacist'), supplierController.getSupplierById);
