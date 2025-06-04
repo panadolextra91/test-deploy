@@ -43,7 +43,7 @@ console.log('Binding to port:', PORT);
 
 // CORS setup
 const allowedOrigins = [
-  'https://medimaster-fe.vercel.app',  // Production frontend
+  'https://frontend-test-deploy-production.up.railway.app',  // Production frontend
   'http://localhost:3001',             // Development frontend
   'http://localhost:3000',
   'http://localhost:8081' // Development app
